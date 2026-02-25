@@ -7,28 +7,41 @@ import {
   OneToMany,
 } from 'typeorm';
 import { User } from './user.entity';
-import { Record } from './record.entity';
+import { GamePlayer } from './game-player.entity';
+import { GameRecord } from './game-record.entity';
 
 @Entity('games')
 export class Game {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column()
-  userId: number;
-
-  @Column()
-  gameType: string; // 斗地主、麻将等
+  @Column({ unique: true })
+  roomCode: string;
 
   @Column({ nullable: true })
-  note: string;
+  creatorId: number | null; // 修改类型，添加 | null
+
+  @Column()
+  gameType: string;
+
+  @Column({ default: 'playing' })
+  status: string;
+
+  @Column({ nullable: true })
+  note: string | null; // 添加 | null
 
   @CreateDateColumn()
   createdAt: Date;
 
-  @ManyToOne(() => User, (user) => user.games)
-  user: User;
+  @Column({ nullable: true, type: 'datetime' })
+  settledAt: Date | null; // 添加 | null
 
-  @OneToMany(() => Record, (record) => record.game)
-  records: Record[];
+  @ManyToOne(() => User, { nullable: true })
+  creator: User | null; // 添加 | null
+
+  @OneToMany(() => GamePlayer, (player) => player.game, { cascade: true })
+  players: GamePlayer[];
+
+  @OneToMany(() => GameRecord, (record) => record.game, { cascade: true })
+  records: GameRecord[];
 }

@@ -4,9 +4,8 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // 启用 CORS
   app.enableCors({
-    origin: 'http://localhost:5173', // 前端地址
+    origin: true, // 允许所有来源（开发环境）
     credentials: true,
   });
 

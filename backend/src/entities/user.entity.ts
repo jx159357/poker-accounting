@@ -25,7 +25,7 @@ export class User {
   @CreateDateColumn()
   createdAt: Date;
 
-  @OneToMany(() => Game, (game) => game.user)
+  @OneToMany(() => Game, (game) => game.creator) // 修改这里
   games: Game[];
 
   @OneToMany(() => Record, (record) => record.user)

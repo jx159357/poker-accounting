@@ -1,127 +1,116 @@
 <template>
   <div class="register-page">
-    <div class="header">
-      <h1>打牌记账</h1>
-      <p>创建新账号</p>
-    </div>
+    <van-nav-bar title="注册账号" left-arrow @click="$router.back()" fixed />
 
-    <van-form @submit="onSubmit">
-      <van-cell-group inset>
-        <van-field
-          v-model="username"
-          name="username"
-          label="用户名"
-          placeholder="请输入用户名"
-          :rules="[{ required: true, message: '请输入用户名' }]"
-        />
-        <van-field
-          v-model="nickname"
-          name="nickname"
-          label="昵称"
-          placeholder="请输入昵称"
-          :rules="[{ required: true, message: '请输入昵称' }]"
-        />
-        <van-field
-          v-model="password"
-          type="password"
-          name="password"
-          label="密码"
-          placeholder="请输入密码（至少6位）"
-          :rules="[
-            { required: true, message: '请输入密码' },
-            { min: 6, message: '密码至少6位' }
-          ]"
-        />
-        <van-field
-          v-model="confirmPassword"
-          type="password"
-          name="confirmPassword"
-          label="确认密码"
-          placeholder="请再次输入密码"
-          :rules="[
-            { required: true, message: '请确认密码' },
-            { validator: validatePassword, message: '两次密码不一致' }
-          ]"
-        />
-      </van-cell-group>
-
-      <div class="button-group">
-        <van-button round block type="primary" native-type="submit" :loading="loading">
-          注册
-        </van-button>
-        <van-button round block plain type="primary" @click="goLogin">
-          已有账号，去登录
-        </van-button>
+    <div class="register-container">
+      <div class="tip-box">
+        <van-icon name="info-o" />
+        <span>注册后将保留您的游客数据</span>
       </div>
-    </van-form>
+
+      <van-form @submit="onSubmit">
+        <van-cell-group inset>
+          <van-field
+            v-model="username"
+            name="username"
+            label="账号"
+            placeholder="请输入账号"
+            :rules="[{ required: true, message: '请输入账号' }]"
+          />
+          <van-field
+            v-model="password"
+            type="password"
+            name="password"
+            label="密码"
+            placeholder="请输入密码"
+            :rules="[{ required: true, message: '请输入密码' }]"
+          />
+          <van-field
+            v-model="nickname"
+            name="nickname"
+            label="昵称"
+            :placeholder="`默认：${userStore.currentNickname}`"
+          />
+        </van-cell-group>
+        <div style="margin: 16px;">
+          <van-button round block type="primary" native-type="submit">
+            注册
+          </van-button>
+        </div>
+      </van-form>
+
+      <div class="footer-link">
+        已有账号？<router-link to="/login">去登录</router-link>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { showToast } from 'vant';
+import { showToast, showLoadingToast, closeToast } from 'vant';
 import { useUserStore } from '../stores/user';
 
 const router = useRouter();
 const userStore = useUserStore();
 
 const username = ref('');
-const nickname = ref('');
 const password = ref('');
-const confirmPassword = ref('');
-const loading = ref(false);
-
-const validatePassword = () => {
-  return password.value === confirmPassword.value;
-};
+const nickname = ref('');
 
 const onSubmit = async () => {
-  loading.value = true;
+  showLoadingToast({ message: '注册中...', forbidClick: true });
+
   try {
-    await userStore.register(username.value, password.value, nickname.value);
+    await userStore.register(
+      username.value,
+      password.value,
+      nickname.value || userStore.currentNickname
+    );
+
+    closeToast();
     showToast('注册成功');
     router.push('/home');
   } catch (error) {
+    closeToast();
     showToast(error.response?.data?.message || '注册失败');
-  } finally {
-    loading.value = false;
   }
-};
-
-const goLogin = () => {
-  router.push('/login');
 };
 </script>
 
 <style scoped>
 .register-page {
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  padding: 60px 20px 20px;
+  background: #f7f8fa;
 }
 
-.header {
+.register-container {
+  padding-top: 46px;
+  padding: 66px 16px 20px;
+}
+
+.tip-box {
+  background: #fff3cd;
+  border: 1px solid #ffc107;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #856404;
+  font-size: 14px;
+}
+
+.footer-link {
   text-align: center;
-  color: white;
-  margin-bottom: 60px;
+  margin-top: 20px;
+  color: #969799;
 }
 
-.header h1 {
-  font-size: 32px;
-  margin-bottom: 10px;
-}
-
-.header p {
-  font-size: 16px;
-  opacity: 0.9;
-}
-
-.button-group {
-  padding: 20px 16px;
-}
-
-.button-group .van-button {
-  margin-bottom: 12px;
+.footer-link a {
+  color: #1989fa;
+  text-decoration: none;
 }
 </style>
