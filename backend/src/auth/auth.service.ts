@@ -1,7 +1,11 @@
-import { Injectable,ConflictException, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  ConflictException,
+} from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { User } from '../entities/user.entity';
 import { GamePlayer } from '../entities/game-player.entity';
@@ -22,11 +26,7 @@ export class AuthService {
     nickname: string,
     guestId?: string,
   ) {
-    console.log('=== 注册新用户 ===');
-    console.log('username:', username);
-    console.log('nickname:', nickname);
-    console.log('guestId:', guestId);
-
+    // 检查用户名是否已存在
     const existingUser = await this.userRepository.findOne({
       where: { username },
     });
@@ -34,52 +34,35 @@ export class AuthService {
       throw new ConflictException('用户名已存在');
     }
 
+    // 加密密码
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const user = new User();
-    user.username = username;
-    user.password = hashedPassword;
-    user.nickname = nickname;
+    // 创建用户
+    const user = this.userRepository.create({
+      username,
+      password: hashedPassword,
+      nickname,
+    });
 
-    const savedUser = await this.userRepository.save(user);
-    console.log('新用户ID:', savedUser.id);
+    await this.userRepository.save(user);
 
-    // 如果提供了 guestId，迁移游客数据
+    // 如果有 guestId，迁移游客数据
     if (guestId) {
-      console.log('开始迁移游客数据...');
-
-      // 查找所有该游客的游戏记录
-      const guestPlayers = await this.playerRepository.find({
-        where: { guestId },
-        relations: ['game'],
-      });
-
-      console.log('找到游客记录数:', guestPlayers.length);
-
-      // 将游客记录关联到新用户
-      for (const player of guestPlayers) {
-        console.log(
-          `迁移玩家记录 ID: ${player.id}, 游戏: ${player.game?.roomCode}`,
-        );
-        player.userId = savedUser.id;
-        // 保留 guestId 以便追溯，但主要使用 userId
-        await this.playerRepository.save(player);
-      }
-
-      console.log('数据迁移完成');
+      await this.migrateGuestData(guestId, user.id);
     }
 
+    // 生成 token
     const token = this.jwtService.sign({
-      id: savedUser.id,
-      username: savedUser.username,
+      id: user.id,
+      username: user.username,
     });
 
     return {
       token,
       user: {
-        id: savedUser.id,
-        username: savedUser.username,
-        nickname: savedUser.nickname,
+        id: user.id,
+        username: user.username,
+        nickname: user.nickname,
       },
     };
   }
@@ -113,6 +96,7 @@ export class AuthService {
     };
   }
 
+  // 获取用户信息
   async getUserInfo(userId: number) {
     const user = await this.userRepository.findOne({ where: { id: userId } });
     if (!user) {
@@ -123,22 +107,11 @@ export class AuthService {
       id: user.id,
       username: user.username,
       nickname: user.nickname,
+      createdAt: user.createdAt,
     };
   }
 
-  async getProfile(userId: number) {
-    const user = await this.userRepository.findOne({ where: { id: userId } });
-    if (!user) {
-      throw new UnauthorizedException('用户不存在');
-    }
-
-    return {
-      id: user.id,
-      username: user.username,
-      nickname: user.nickname,
-    };
-  }
-
+  // 更新用户资料
   async updateProfile(userId: number, nickname: string) {
     const user = await this.userRepository.findOne({ where: { id: userId } });
     if (!user) {
@@ -153,5 +126,31 @@ export class AuthService {
       username: user.username,
       nickname: user.nickname,
     };
+  }
+
+  // 迁移游客数据到正式用户
+  private async migrateGuestData(guestId: string, userId: number) {
+    // 查找所有游客的游戏记录
+    const guestPlayers = await this.playerRepository.find({
+      where: { guestId },
+      relations: ['game'],
+    });
+
+    // 更新为正式用户
+    for (const player of guestPlayers) {
+      player.userId = userId;
+      player.guestId = null; // 清除 guestId
+      await this.playerRepository.save(player);
+    }
+
+    console.log(`成功迁移 ${guestPlayers.length} 条游客数据到用户 ${userId}`);
+  }
+
+  async validateUser(userId: number) {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new UnauthorizedException('用户不存在');
+    }
+    return user;
   }
 }

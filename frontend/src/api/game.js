@@ -1,54 +1,43 @@
-import request from '../utils/request';
-import { useUserStore } from '../stores/user';
+import request from '../utils/request'
 
 export const gameApi = {
   // 创建房间
   createRoom(data) {
-    const userStore = useUserStore();
-    return request.post('/game/create', {
-      ...data,
-      guestId: userStore.isGuest ? userStore.currentUserId : undefined,
-    });
+    return request.post('/game/create', data)
   },
 
   // 加入房间
   joinRoom(data) {
-    const userStore = useUserStore();
-    return request.post('/game/join', {
-      ...data,
-      guestId: userStore.isGuest ? userStore.currentUserId : undefined,
-    });
+    return request.post('/game/join', data)
   },
 
   // 获取房间详情
-  getGameDetail(roomCode) {
-    return request.get(`/game/${roomCode}`);
+  getRoomDetail(roomCode) {
+    return request.get(`/game/${roomCode}`)
   },
 
-  // 记账
+  // 获取我的房间列表
+  getMyGames() {
+    return request.get('/game/my-games')
+  },
+
+  // 添加记分记录
   addScore(roomCode, data) {
-    return request.post(`/game/${roomCode}/score`, data);
+    return request.post(`/game/${roomCode}/score`, data)
   },
 
-  // 撤销记账
+  // 撤销记录
   undoRecord(roomCode, recordId) {
-    return request.post(`/game/${roomCode}/undo`, { recordId });
+    return request.delete(`/game/${roomCode}/record/${recordId}`)
   },
 
-  // 结算
-  settleRoom(roomCode, keepRecords = false) {
-    return request.post(`/game/${roomCode}/settle`, { keepRecords });
+  // 结算本局（不清空记录）
+  settleRound(roomCode) {
+    return request.post(`/game/${roomCode}/settle`, { clearRecords: false })
   },
 
-  // 获取用户房间列表
-  getUserGames() {
-    const userStore = useUserStore();
-    const params = {};
-
-    if (userStore.isGuest) {
-      params.guestId = userStore.currentUserId;
-    }
-
-    return request.get('/game/user/list', { params });
-  },
-};
+  // 结束房间（清空记录）
+  finishRoom(roomCode) {
+    return request.post(`/game/${roomCode}/finish`)
+  }
+}

@@ -1,29 +1,212 @@
+<script setup>
+import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { showToast, showLoadingToast, closeToast, showDialog } from 'vant'
+import { useUserStore } from '../stores/user'
+import { gameApi } from '../api/game'
+
+const router = useRouter()
+const userStore = useUserStore()
+
+const showJoinDialog = ref(false)
+const roomCode = ref('')
+const myGames = ref([])
+const loading = ref(false)
+
+// 加载我的房间列表
+const loadMyGames = async () => {
+  loading.value = true
+  try {
+    const data = await gameApi.getMyGames()
+    myGames.value = data || []
+  } catch (error) {
+    console.error('加载房间列表失败', error)
+    showToast('加载失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+// 创建房间
+const createRoom = async () => {
+  showLoadingToast({ message: '创建中...', forbidClick: true })
+
+  try {
+    const data = await gameApi.createRoom({
+      gameType: '跑得快',
+      nickname: userStore.currentNickname
+    })
+
+    closeToast()
+    showToast('创建成功')
+
+    // 跳转到房间页面
+    router.push(`/room/${data.roomCode}`)
+  } catch (error) {
+    closeToast()
+    console.error('创建房间失败', error)
+    showToast(error.response?.data?.message || '创建失败')
+  }
+}
+
+// 加入房间
+const joinRoom = async () => {
+  if (!roomCode.value || roomCode.value.length !== 6) {
+    showToast('请输入6位房间号')
+    return
+  }
+
+  showLoadingToast({ message: '加入中...', forbidClick: true })
+
+  try {
+    const data = await gameApi.joinRoom({
+      roomCode: roomCode.value,
+      nickname: userStore.currentNickname
+    })
+
+    closeToast()
+    showToast('加入成功')
+    showJoinDialog.value = false
+
+    // 跳转到房间页面
+    router.push(`/room/${roomCode.value}`)
+    roomCode.value = ''
+  } catch (error) {
+    closeToast()
+    console.error('加入房间失败', error)
+    showToast(error.response?.data?.message || '加入失败')
+  }
+}
+
+// 进入房间
+const enterRoom = game => {
+  router.push(`/room/${game.roomCode}`)
+}
+
+// 格式化时间
+const formatTime = timestamp => {
+  const date = new Date(timestamp)
+  const now = new Date()
+  const diff = now - date
+
+  if (diff < 60000) return '刚刚'
+  if (diff < 3600000) return `${Math.floor(diff / 60000)}分钟前`
+  if (diff < 86400000) return `${Math.floor(diff / 3600000)}小时前`
+  return date.toLocaleDateString('zh-CN')
+}
+
+// 获取房间状态文本
+const getStatusText = status => {
+  const statusMap = {
+    playing: '进行中',
+    settled: '已结算',
+    finished: '已结束'
+  }
+  return statusMap[status] || status
+}
+
+// 获取房间状态颜色
+const getStatusType = status => {
+  const typeMap = {
+    playing: 'primary',
+    settled: 'warning',
+    finished: 'default'
+  }
+  return typeMap[status] || 'default'
+}
+
+// 去个人资料页
+const goProfile = () => {
+  router.push('/profile')
+}
+
+// 修改昵称
+const changeNickname = () => {
+  if (userStore.isGuest) {
+    showDialog({
+      title: '修改昵称',
+      message: '请输入新昵称',
+      showCancelButton: true,
+      beforeClose: (action, done) => {
+        if (action === 'confirm') {
+          const input = document.querySelector('.van-dialog__message input')
+          const nickname = input?.value?.trim()
+          if (nickname) {
+            userStore.setGuestNickname(nickname)
+            showToast('修改成功')
+            done()
+          } else {
+            showToast('请输入昵称')
+            done(false)
+          }
+        } else {
+          done(false)
+        }
+      }
+    }).then(() => {
+      // 刷新页面
+      loadMyGames()
+    })
+  } else {
+    router.push('/profile')
+  }
+}
+
+onMounted(() => {
+  loadMyGames()
+})
+</script>
+
 <template>
   <div class="home-page">
     <van-nav-bar title="打牌记账" fixed>
       <template #right>
-        <van-icon name="user-o" size="20" @click="$router.push('/profile')" />
+        <van-icon name="user-o" size="20" @click="goProfile" />
       </template>
     </van-nav-bar>
 
     <div class="home-container">
       <!-- 用户信息卡片 -->
       <div class="user-card">
-        <div class="user-avatar" :style="avatarStyle">
-          <span class="avatar-text">{{ avatarText }}</span>
-        </div>
         <div class="user-info">
-          <div class="user-name">{{ userStore.currentNickname }}</div>
-          <div class="user-type">{{ userStore.isGuest ? '游客模式' : '已登录' }}</div>
+          <div class="user-avatar">
+            <span>{{ userStore.currentNickname?.charAt(0) || 'U' }}</span>
+          </div>
+          <div class="user-details">
+            <div class="user-name">{{ userStore.currentNickname || '未命名' }}</div>
+            <div class="user-type">
+              <van-tag :type="userStore.isGuest ? 'warning' : 'success'" size="medium">
+                {{ userStore.isGuest ? '游客' : '用户' }}
+              </van-tag>
+            </div>
+          </div>
+          <van-button size="small" plain @click="changeNickname"> 修改昵称 </van-button>
+        </div>
+
+        <!-- 游客提示 -->
+        <div v-if="userStore.isGuest" class="guest-tip">
+          <van-notice-bar
+            left-icon="info-o"
+            text="游客模式下数据仅保存在本地，注册后可同步到云端"
+            background="#fff7e6"
+            color="#ed6a0c"
+          />
+          <van-button
+            type="primary"
+            size="small"
+            block
+            @click="router.push('/register')"
+            style="margin-top: 12px"
+          >
+            立即注册
+          </van-button>
         </div>
       </div>
 
-      <!-- 快速操作 -->
-      <div class="quick-actions">
-        <van-button type="primary" size="large" block @click="showCreateDialog = true" icon="plus">
-          创建房间
-        </van-button>
-        <van-button type="success" size="large" block @click="showJoinDialog = true" icon="friends-o">
+      <!-- 操作按钮 -->
+      <div class="action-buttons">
+        <van-button type="primary" size="large" block @click="createRoom"> 创建房间 </van-button>
+        <van-button type="success" size="large" block @click="showJoinDialog = true">
           加入房间
         </van-button>
       </div>
@@ -31,70 +214,32 @@
       <!-- 我的房间列表 -->
       <div class="room-list-section">
         <div class="section-header">
-          <span class="section-title">我的房间</span>
-          <van-button size="small" plain @click="loadMyGames" icon="replay">刷新</van-button>
+          <span>我的房间</span>
+          <van-button size="small" plain @click="loadMyGames">刷新</van-button>
         </div>
 
-        <van-pull-refresh v-model="refreshing" @refresh="onRefresh">
-          <div v-if="loading" class="loading-wrapper">
-            <van-loading size="24px">加载中...</van-loading>
-          </div>
-
-          <div v-else-if="myGames.length === 0" class="empty-wrapper">
-            <van-empty description="还没有房间" image-size="100">
-              <van-button type="primary" @click="showCreateDialog = true">创建第一个房间</van-button>
-            </van-empty>
-          </div>
-
-          <div v-else class="room-list">
-            <div
-              v-for="game in myGames"
-              :key="game.id"
-              class="room-item"
-              @click="enterRoom(game.roomCode)"
-            >
+        <van-pull-refresh v-model="loading" @refresh="loadMyGames">
+          <div v-if="myGames.length > 0" class="room-list">
+            <div v-for="game in myGames" :key="game.id" class="room-item" @click="enterRoom(game)">
               <div class="room-header">
-                <div class="room-code">
-                  <van-tag type="primary" size="large">{{ game.roomCode }}</van-tag>
-                </div>
-                <div class="room-status">
-                  <van-tag :type="game.status === 'playing' ? 'success' : 'default'">
-                    {{ game.status === 'playing' ? '进行中' : '已结束' }}
+                <div class="room-title">
+                  <span class="room-type">{{ game.gameType }}</span>
+                  <van-tag :type="getStatusType(game.status)" size="medium">
+                    {{ getStatusText(game.status) }}
                   </van-tag>
                 </div>
+                <div class="room-code">{{ game.roomCode }}</div>
               </div>
-
               <div class="room-info">
-                <div class="room-type">{{ game.gameType }}</div>
-                <div class="room-players">
-                  <van-icon name="friends-o" />
-                  {{ game.playerCount }}/4 人
-                </div>
-              </div>
-
-              <div class="room-time">
-                创建于 {{ formatTime(game.createdAt) }}
+                <span class="room-players">{{ game.players?.length || 0 }} 人</span>
+                <span class="room-time">{{ formatTime(game.createdAt) }}</span>
               </div>
             </div>
           </div>
+          <van-empty v-else description="还没有房间" image-size="80" />
         </van-pull-refresh>
       </div>
     </div>
-
-    <!-- 创建房间弹窗 -->
-    <van-dialog
-      v-model:show="showCreateDialog"
-      title="创建房间"
-      show-cancel-button
-      @confirm="createRoom"
-    >
-      <van-field
-        v-model="gameType"
-        label="游戏类型"
-        placeholder="例如：斗地主、麻将"
-        maxlength="20"
-      />
-    </van-dialog>
 
     <!-- 加入房间弹窗 -->
     <van-dialog
@@ -104,157 +249,15 @@
       @confirm="joinRoom"
     >
       <van-field
-        v-model="joinRoomCode"
-        label="房间号"
-        placeholder="请输入6位房间号"
+        v-model="roomCode"
         type="digit"
+        placeholder="请输入6位房间号"
         maxlength="6"
+        center
       />
     </van-dialog>
   </div>
 </template>
-
-<script setup>
-import { ref, computed, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
-import { showToast, showLoadingToast, closeToast } from 'vant';
-import { useUserStore } from '../stores/user';
-import { gameApi } from '../api/game';
-import { getNameInitial, getAvatarColorByString } from '../utils/nameGenerator';
-
-const router = useRouter();
-const userStore = useUserStore();
-
-const myGames = ref([]);
-const loading = ref(false);
-const refreshing = ref(false);
-const showCreateDialog = ref(false);
-const showJoinDialog = ref(false);
-const gameType = ref('');
-const joinRoomCode = ref('');
-
-const avatarText = computed(() => {
-  return getNameInitial(userStore.currentNickname);
-});
-
-const avatarStyle = computed(() => {
-  const color = getAvatarColorByString(userStore.currentUserId);
-  return {
-    background: color.bg,
-    color: color.text,
-  };
-});
-
-const formatTime = (timestamp) => {
-  const date = new Date(timestamp);
-  const now = new Date();
-  const diff = now - date;
-
-  // 小于1分钟
-  if (diff < 60000) {
-    return '刚刚';
-  }
-  // 小于1小时
-  if (diff < 3600000) {
-    return `${Math.floor(diff / 60000)}分钟前`;
-  }
-  // 小于1天
-  if (diff < 86400000) {
-    return `${Math.floor(diff / 3600000)}小时前`;
-  }
-  // 小于7天
-  if (diff < 604800000) {
-    return `${Math.floor(diff / 86400000)}天前`;
-  }
-
-  // 超过7天显示日期
-  return date.toLocaleDateString('zh-CN', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
-};
-
-const loadMyGames = async () => {
-  loading.value = true;
-  try {
-    const data = await gameApi.getMyGames();
-    myGames.value = data;
-  } catch (error) {
-    console.error('加载房间列表失败', error);
-    showToast('加载失败');
-  } finally {
-    loading.value = false;
-  }
-};
-
-const onRefresh = async () => {
-  await loadMyGames();
-  refreshing.value = false;
-  showToast('刷新成功');
-};
-
-const createRoom = async () => {
-  if (!gameType.value.trim()) {
-    showToast('请输入游戏类型');
-    return;
-  }
-
-  showLoadingToast({ message: '创建中...', forbidClick: true });
-
-  try {
-    const data = await gameApi.createRoom({
-      gameType: gameType.value,
-      nickname: userStore.currentNickname,
-    });
-
-    closeToast();
-    showToast('创建成功');
-    gameType.value = '';
-
-    // 跳转到房间
-    router.push(`/room/${data.roomCode}`);
-  } catch (error) {
-    closeToast();
-    showToast('创建失败');
-  }
-};
-
-const joinRoom = async () => {
-  if (!joinRoomCode.value || joinRoomCode.value.length !== 6) {
-    showToast('请输入正确的房间号');
-    return;
-  }
-
-  showLoadingToast({ message: '加入中...', forbidClick: true });
-
-  try {
-    await gameApi.joinRoom({
-      roomCode: joinRoomCode.value,
-      nickname: userStore.currentNickname,
-    });
-
-    closeToast();
-    showToast('加入成功');
-    joinRoomCode.value = '';
-
-    // 跳转到房间
-    router.push(`/room/${joinRoomCode.value}`);
-  } catch (error) {
-    closeToast();
-    showToast(error.response?.data?.message || '加入失败');
-  }
-};
-
-const enterRoom = (roomCode) => {
-  router.push(`/room/${roomCode}`);
-};
-
-onMounted(() => {
-  loadMyGames();
-});
-</script>
 
 <style scoped>
 .home-page {
@@ -268,74 +271,77 @@ onMounted(() => {
 }
 
 .user-card {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  padding: 24px 16px;
+  background: white;
+  margin: 16px;
+  padding: 20px;
+  border-radius: 16px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+}
+
+.user-info {
   display: flex;
   align-items: center;
   gap: 16px;
-  color: white;
 }
 
 .user-avatar {
   width: 60px;
   height: 60px;
   border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 24px;
   font-weight: bold;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
   flex-shrink: 0;
 }
 
-.avatar-text {
-  user-select: none;
-}
-
-.user-info {
+.user-details {
   flex: 1;
 }
 
 .user-name {
-  font-size: 20px;
-  font-weight: bold;
+  font-size: 18px;
+  font-weight: 600;
+  color: #323233;
   margin-bottom: 4px;
 }
 
 .user-type {
   font-size: 14px;
-  opacity: 0.9;
+  color: #969799;
 }
 
-.quick-actions {
-  padding: 16px;
+.guest-tip {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #ebedf0;
+}
+
+.action-buttons {
+  padding: 0 16px;
   display: flex;
   gap: 12px;
+  margin-bottom: 16px;
 }
 
 .room-list-section {
-  padding: 0 16px;
+  background: white;
+  margin: 0 16px;
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
 }
 
 .section-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
-}
-
-.section-title {
+  margin-bottom: 16px;
   font-size: 16px;
-  font-weight: bold;
-  color: #323233;
-}
-
-.loading-wrapper,
-.empty-wrapper {
-  padding: 40px 0;
-  display: flex;
-  justify-content: center;
+  font-weight: 600;
 }
 
 .room-list {
@@ -345,53 +351,48 @@ onMounted(() => {
 }
 
 .room-item {
-  background: white;
+  background: #f7f8fa;
   border-radius: 12px;
   padding: 16px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
   cursor: pointer;
   transition: all 0.3s;
 }
 
 .room-item:active {
   transform: scale(0.98);
+  background: #ebedf0;
 }
 
 .room-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
+}
+
+.room-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.room-type {
+  font-size: 16px;
+  font-weight: 600;
+  color: #323233;
 }
 
 .room-code {
   font-size: 18px;
   font-weight: bold;
+  color: #1989fa;
+  letter-spacing: 2px;
 }
 
 .room-info {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-}
-
-.room-type {
-  font-size: 16px;
-  color: #323233;
-  font-weight: 500;
-}
-
-.room-players {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  color: #969799;
   font-size: 14px;
-}
-
-.room-time {
-  font-size: 12px;
   color: #969799;
 }
 </style>

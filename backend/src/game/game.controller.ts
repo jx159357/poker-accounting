@@ -1,101 +1,170 @@
 import {
   Controller,
-  Post,
   Get,
+  Post,
+  Delete,
   Body,
   Param,
-  Query,
   Request,
+  UseGuards,
+  HttpException,
+  HttpStatus,
 } from '@nestjs/common';
 import { GameService } from './game.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('game')
+@UseGuards(JwtAuthGuard)
 export class GameController {
   constructor(private gameService: GameService) {}
 
-  // 创建房间
   @Post('create')
-  async createRoom(
-    @Body() body: { gameType: string; nickname: string; guestId?: string },
+  async createGame(
+    @Body() body: { gameType: string; nickname: string },
     @Request() req,
   ) {
-    const userId = req.user?.id;
-    return this.gameService.createRoom(
-      body.gameType,
-      body.nickname,
-      userId,
-      body.guestId,
-    );
+    try {
+      const userId = req.user?.id;
+      const guestId = req.headers['x-guest-id'];
+
+      if (!userId && !guestId) {
+        throw new HttpException('未授权', HttpStatus.UNAUTHORIZED);
+      }
+
+      return await this.gameService.createGame(
+        body.gameType,
+        userId,
+        guestId,
+        body.nickname,
+      );
+    } catch (error) {
+      throw new HttpException(
+        error.message || '创建房间失败',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
   }
 
-  // 加入房间
   @Post('join')
-  async joinRoom(
-    @Body() body: { roomCode: string; nickname: string; guestId?: string },
+  async joinGame(
+    @Body() body: { roomCode: string; nickname: string },
     @Request() req,
   ) {
-    const userId = req.user?.id;
-    return this.gameService.joinRoom(
-      body.roomCode,
-      body.nickname,
-      userId,
-      body.guestId,
-    );
+    try {
+      const userId = req.user?.id;
+      const guestId = req.headers['x-guest-id'];
+
+      if (!userId && !guestId) {
+        throw new HttpException('未授权', HttpStatus.UNAUTHORIZED);
+      }
+
+      return await this.gameService.joinGame(
+        body.roomCode,
+        userId,
+        guestId,
+        body.nickname,
+      );
+    } catch (error) {
+      throw new HttpException(
+        error.message || '加入房间失败',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
   }
 
-  // 获取房间详情
+  @Get('my-games')
+  async getMyGames(@Request() req) {
+    try {
+      const userId = req.user?.id;
+      const guestId = req.headers['x-guest-id'];
+
+      if (!userId && !guestId) {
+        return [];
+      }
+
+      return await this.gameService.getMyGames(userId, guestId);
+    } catch (error) {
+      throw new HttpException(
+        error.message || '获取房间列表失败',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
+
   @Get(':roomCode')
-  async getGameDetail(@Param('roomCode') roomCode: string) {
-    return this.gameService.getGameDetail(roomCode);
+  async getRoomDetail(@Param('roomCode') roomCode: string) {
+    try {
+      return await this.gameService.getRoomDetail(roomCode);
+    } catch (error) {
+      throw new HttpException(
+        error.message || '获取房间详情失败',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
   }
 
-  // 记账
   @Post(':roomCode/score')
   async addScore(
     @Param('roomCode') roomCode: string,
-    @Body()
-    body: {
-      fromPlayerId: number;
-      toPlayerId: number;
-      amount: number;
-      note?: string;
-    },
+    @Body() body: { fromPlayerId: number; toPlayerId: number; amount: number },
   ) {
-    return this.gameService.addScore(
-      roomCode,
-      body.fromPlayerId,
-      body.toPlayerId,
-      body.amount,
-      body.note,
-    );
+    try {
+      return await this.gameService.addScore(
+        roomCode,
+        body.fromPlayerId,
+        body.toPlayerId,
+        body.amount,
+      );
+    } catch (error) {
+      throw new HttpException(
+        error.message || '添加记分失败',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
   }
 
-  // 撤销记账
-  @Post(':roomCode/undo')
+  @Delete(':roomCode/record/:recordId')
   async undoRecord(
     @Param('roomCode') roomCode: string,
-    @Body() body: { recordId: number },
+    @Param('recordId') recordId: string,
   ) {
-    return this.gameService.undoRecord(roomCode, body.recordId);
+    try {
+      return await this.gameService.undoRecord(roomCode, parseInt(recordId));
+    } catch (error) {
+      throw new HttpException(
+        error.message || '撤销记录失败',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
   }
 
-  // 结算
   @Post(':roomCode/settle')
   async settleRoom(
     @Param('roomCode') roomCode: string,
-    @Body() body: { keepRecords?: boolean },
+    @Body() body: { clearRecords?: boolean },
   ) {
-    return this.gameService.settleRoom(roomCode, body.keepRecords || false);
+    try {
+      return await this.gameService.settleRoom(
+        roomCode,
+        body.clearRecords || false,
+      );
+    } catch (error) {
+      throw new HttpException(
+        error.message || '结算失败',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
   }
 
-  // 获取用户的所有房间
-  @Get('user/list')
-  async getUserGames(
-    @Query('guestId') guestId: string,
-    @Query('nickname') nickname: string,
-    @Request() req,
-  ) {
-    const userId = req.user?.id;
-    return this.gameService.getUserGames(userId, guestId, nickname);
+  @Post(':roomCode/finish')
+  async finishRoom(@Param('roomCode') roomCode: string) {
+    try {
+      return await this.gameService.finishRoom(roomCode);
+    } catch (error) {
+      throw new HttpException(
+        error.message || '结束房间失败',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
   }
 }

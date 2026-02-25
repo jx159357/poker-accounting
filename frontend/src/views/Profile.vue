@@ -27,40 +27,20 @@
           label="账号"
           readonly
         />
-        <van-field
-          :model-value="userId"
-          label="ID"
-          readonly
-        />
+        <van-field :model-value="userId" label="ID" readonly />
       </van-cell-group>
 
       <!-- 操作按钮 -->
       <div class="action-buttons">
-        <van-button
-          v-if="!isEditing"
-          type="primary"
-          size="large"
-          block
-          @click="startEdit"
-        >
+        <van-button v-if="!isEditing" type="primary" size="large" block @click="startEdit">
           修改昵称
         </van-button>
         <template v-else>
-          <van-button type="primary" size="large" block @click="saveNickname">
-            保存
-          </van-button>
-          <van-button size="large" block @click="cancelEdit">
-            取消
-          </van-button>
+          <van-button type="primary" size="large" block @click="saveNickname"> 保存 </van-button>
+          <van-button size="large" block @click="cancelEdit"> 取消 </van-button>
         </template>
 
-        <van-button
-          v-if="userStore.isGuest"
-          type="success"
-          size="large"
-          block
-          @click="goRegister"
-        >
+        <van-button v-if="userStore.isGuest" type="success" size="large" block @click="goRegister">
           注册账号（保留数据）
         </van-button>
 
@@ -79,94 +59,94 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
-import { showToast, showConfirmDialog, showLoadingToast, closeToast } from 'vant';
-import { useUserStore } from '../stores/user';
-import { getNameInitial, getAvatarColorByString } from '../utils/nameGenerator';
+import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { showToast, showConfirmDialog, showLoadingToast, closeToast } from 'vant'
+import { useUserStore } from '../stores/user'
+import { getNameInitial, getAvatarColorByString } from '../utils/nameGenerator'
 
-const router = useRouter();
-const userStore = useUserStore();
+const router = useRouter()
+const userStore = useUserStore()
 
-const nickname = ref(userStore.currentNickname);
-const isEditing = ref(false);
-const originalNickname = ref('');
+const nickname = ref(userStore.currentNickname)
+const isEditing = ref(false)
+const originalNickname = ref('')
 
 const userId = computed(() => {
-  const id = userStore.currentUserId;
-  return id.length > 8 ? id.substring(0, 8) + '...' : id;
-});
+  const id = userStore.isLoggedIn ? userStore.currentUserId : userStore.currentGuestId
+  return id?.length > 8 ? id.substring(0, 8) + '...' : id
+})
 
 const avatarText = computed(() => {
-  return getNameInitial(nickname.value);
-});
+  return getNameInitial(nickname.value)
+})
 
 const avatarStyle = computed(() => {
-  const color = getAvatarColorByString(userStore.currentUserId);
+  const color = getAvatarColorByString(userStore.currentUserId)
   return {
     background: color.bg,
-    color: color.text,
-  };
-});
+    color: color.text
+  }
+})
 
 const startEdit = () => {
-  originalNickname.value = nickname.value;
-  isEditing.value = true;
-};
+  originalNickname.value = nickname.value
+  isEditing.value = true
+}
 
 const cancelEdit = () => {
-  nickname.value = originalNickname.value;
-  isEditing.value = false;
-};
+  nickname.value = originalNickname.value
+  isEditing.value = false
+}
 
 const saveNickname = async () => {
   if (!nickname.value.trim()) {
-    showToast('昵称不能为空');
-    return;
+    showToast('昵称不能为空')
+    return
   }
 
-  showLoadingToast({ message: '保存中...', forbidClick: true });
+  showLoadingToast({ message: '保存中...', forbidClick: true })
 
   try {
-    await userStore.updateNickname(nickname.value);
-    closeToast();
-    showToast('保存成功');
-    isEditing.value = false;
+    await userStore.updateNickname(nickname.value)
+    closeToast()
+    showToast('保存成功')
+    isEditing.value = false
   } catch (error) {
-    closeToast();
-    showToast('保存失败');
+    closeToast()
+    showToast('保存失败')
   }
-};
+}
 
 const goRegister = () => {
-  router.push('/register');
-};
+  router.push('/register')
+}
 
 const confirmLogout = async () => {
   try {
     await showConfirmDialog({
       title: '确认退出',
-      message: '退出后将变为游客模式',
-    });
-    userStore.logout();
-    showToast('已退出登录');
-    router.push('/home');
+      message: '退出后将变为游客模式'
+    })
+    userStore.logout()
+    showToast('已退出登录')
+    router.push('/home')
   } catch {
     // 取消
   }
-};
+}
 
 // 组件挂载时确保用户信息已加载
 onMounted(async () => {
   if (!userStore.isGuest && !userStore.userInfo) {
     try {
-      await userStore.getUserInfo();
-      nickname.value = userStore.currentNickname;
+      await userStore.getUserInfo()
+      nickname.value = userStore.currentNickname
     } catch (error) {
-      console.error('加载用户信息失败:', error);
+      console.error('加载用户信息失败:', error)
     }
   }
-});
+})
 </script>
 
 <style scoped>

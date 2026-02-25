@@ -216,7 +216,7 @@ const formatTime = timestamp => {
 
 const loadGameData = async () => {
   try {
-    const data = await gameApi.getGameDetail(roomCode)
+    const data = await gameApi.getRoomDetail(roomCode)
     game.value = data
   } catch (error) {
     console.error('加载房间数据失败', error)
@@ -292,23 +292,11 @@ const undoRecord = async recordId => {
 
 const confirmSettle = async () => {
   try {
-    await showConfirmDialog({
-      title: '确认结算',
-      message: '结算后将清空本局记录，只保留最终分数。确定要结算吗？'
-    })
-
-    showLoadingToast({ message: '结算中...', forbidClick: true })
-
-    await gameApi.settleRoom(roomCode, false)
-
-    closeToast()
-    showToast('结算成功')
-    await loadGameData()
+    // 结算当前对局，但不清空记录
+    await gameApi.settleRound(route.params.id)
+    showToast('对局结算成功')
   } catch (error) {
-    if (error !== 'cancel') {
-      closeToast()
-      showToast('结算失败')
-    }
+    showToast(error.message || '结算失败')
   }
 }
 

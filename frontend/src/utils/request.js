@@ -1,17 +1,27 @@
 import axios from 'axios'
+import { showToast } from 'vant'
+import { useUserStore } from '../stores/user'
 
 const request = axios.create({
-  baseURL: 'http://localhost:3000',
-  timeout: 5000
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000',
+  timeout: 10000
 })
 
 // 请求拦截器
 request.interceptors.request.use(
   config => {
-    const token = localStorage.getItem('token')
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
+    const userStore = useUserStore()
+
+    // 如果有 token，添加到请求头
+    if (userStore.token) {
+      config.headers.Authorization = `Bearer ${userStore.token}`
     }
+
+    // 如果是游客，添加 guestId 到请求头
+    if (userStore.guestId) {
+      config.headers['x-guest-id'] = userStore.guestId
+    }
+
     return config
   },
   error => {
@@ -25,7 +35,19 @@ request.interceptors.response.use(
     return response.data
   },
   error => {
-    console.error('请求错误：', error)
+    const message = error.response?.data?.message || error.message || '请求失败'
+
+    // 401 未授权
+    if (error.response?.status === 401) {
+      const userStore = useUserStore()
+      userStore.logout()
+      showToast('登录已过期，请重新登录')
+      // 可以跳转到登录页
+      // router.push('/login')
+    } else {
+      showToast(message)
+    }
+
     return Promise.reject(error)
   }
 )

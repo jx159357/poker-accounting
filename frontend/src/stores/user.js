@@ -1,136 +1,132 @@
 import { defineStore } from 'pinia'
-import request from '../utils/request'
-import { generateRandomName } from '../utils/nameGenerator'
+import { ref, computed } from 'vue'
+import { authApi } from '../api/auth'
 
-function generateUUID() {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-    const r = (Math.random() * 16) | 0
-    const v = c === 'x' ? r : (r & 0x3) | 0x8
-    return v.toString(16)
+export const useUserStore = defineStore('user', () => {
+  const token = ref(localStorage.getItem('token') || '')
+  const user = ref(JSON.parse(localStorage.getItem('user') || 'null'))
+  const guestId = ref(localStorage.getItem('guestId') || '')
+  const guestNickname = ref(localStorage.getItem('guestNickname') || '')
+
+  // 是否是游客
+  const isGuest = computed(() => !token.value && !!guestId.value)
+
+  // 是否已登录
+  const isLoggedIn = computed(() => !!token.value)
+
+  // 当前昵称
+  const currentNickname = computed(() => {
+    if (user.value?.nickname) return user.value.nickname
+    if (guestNickname.value) return guestNickname.value
+    return '游客'
   })
-}
 
-export const useUserStore = defineStore('user', {
-  state: () => ({
-    token: localStorage.getItem('token') || '',
-    userInfo: null,
-    isGuest: !localStorage.getItem('token'),
-    guestId: localStorage.getItem('guestId') || '',
-    guestNickname: localStorage.getItem('guestNickname') || ''
-  }),
+  // 当前用户ID（用于后端）
+  const currentUserId = computed(() => user.value?.id || null)
 
-  getters: {
-    currentUserId: state => {
-      if (state.isGuest) {
-        if (!state.guestId) {
-          const id = generateUUID()
-          state.guestId = id
-          localStorage.setItem('guestId', id)
-        }
-        return state.guestId
-      }
-      return state.userInfo?.id?.toString() || ''
-    },
+  // 当前游客ID（用于后端）
+  const currentGuestId = computed(() => guestId.value || null)
 
-    currentNickname: state => {
-      if (state.isGuest) {
-        if (!state.guestNickname) {
-          const nickname = generateRandomName()
-          state.guestNickname = nickname
-          localStorage.setItem('guestNickname', nickname)
-        }
-        return state.guestNickname
-      }
-      return state.userInfo?.nickname || '用户'
+  // 初始化游客
+  const initGuest = () => {
+    if (!guestId.value) {
+      // 生成 UUID
+      const uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+        const r = (Math.random() * 16) | 0
+        const v = c === 'x' ? r : (r & 0x3) | 0x8
+        return v.toString(16)
+      })
+      guestId.value = uuid
+      localStorage.setItem('guestId', uuid)
     }
-  },
 
-  actions: {
-    setGuestNickname(nickname) {
-      this.guestNickname = nickname
+    if (!guestNickname.value) {
+      const nickname = `游客${Math.floor(Math.random() * 10000)}`
+      guestNickname.value = nickname
       localStorage.setItem('guestNickname', nickname)
-    },
-
-    async register(username, password, nickname) {
-      try {
-        const finalNickname = nickname || this.guestNickname || generateRandomName()
-
-        const res = await request.post('/auth/register', {
-          username,
-          password,
-          nickname: finalNickname,
-          guestId: this.isGuest ? this.guestId : undefined
-        })
-
-        this.token = res.token
-        this.userInfo = res.user
-        this.isGuest = false
-        localStorage.setItem('token', res.token)
-
-        // 注册成功后立即获取完整用户信息
-        await this.getUserInfo()
-
-        return res
-      } catch (error) {
-        throw error
-      }
-    },
-
-    async login(username, password) {
-      try {
-        const res = await request.post('/auth/login', {
-          username,
-          password
-        })
-        this.token = res.token
-        this.userInfo = res.user
-        this.isGuest = false
-        localStorage.setItem('token', res.token)
-
-        // 登录成功后立即获取完整用户信息
-        await this.getUserInfo()
-
-        return res
-      } catch (error) {
-        throw error
-      }
-    },
-
-    logout() {
-      this.token = ''
-      this.userInfo = null
-      this.isGuest = true
-      localStorage.removeItem('token')
-    },
-
-    async getUserInfo() {
-      if (this.isGuest) {
-        return null
-      }
-      try {
-        const res = await request.get('/auth/me')
-        this.userInfo = res
-        return res
-      } catch (error) {
-        console.error('获取用户信息失败:', error)
-        this.logout()
-        throw error
-      }
-    },
-
-    async updateNickname(nickname) {
-      if (this.isGuest) {
-        this.setGuestNickname(nickname)
-        return { nickname }
-      } else {
-        try {
-          const res = await request.put('/auth/profile', { nickname })
-          this.userInfo.nickname = nickname
-          return res
-        } catch (error) {
-          throw error
-        }
-      }
     }
+  }
+
+  // 设置游客昵称
+  const setGuestNickname = nickname => {
+    guestNickname.value = nickname
+    localStorage.setItem('guestNickname', nickname)
+  }
+
+  // 登录
+  const login = async (username, password) => {
+    const data = await authApi.login({ username, password })
+    token.value = data.token
+    user.value = data.user
+    localStorage.setItem('token', data.token)
+    localStorage.setItem('user', JSON.stringify(data.user))
+
+    // 登录后清除游客信息（数据已迁移）
+    localStorage.removeItem('guestId')
+    localStorage.removeItem('guestNickname')
+    guestId.value = ''
+    guestNickname.value = ''
+  }
+
+  // 注册
+  const register = async (username, password, nickname) => {
+    // 注册时携带 guestId，后端会自动迁移数据
+    const data = await authApi.register({
+      username,
+      password,
+      nickname,
+      guestId: guestId.value
+    })
+    token.value = data.token
+    user.value = data.user
+    localStorage.setItem('token', data.token)
+    localStorage.setItem('user', JSON.stringify(data.user))
+
+    // 注册后清除游客信息
+    localStorage.removeItem('guestId')
+    localStorage.removeItem('guestNickname')
+    guestId.value = ''
+    guestNickname.value = ''
+  }
+
+  // 登出
+  const logout = () => {
+    token.value = ''
+    user.value = null
+    localStorage.removeItem('token')
+    localStorage.removeItem('user')
+
+    // 重新初始化游客
+    initGuest()
+  }
+
+  // 更新用户信息
+  const updateUser = userData => {
+    user.value = { ...user.value, ...userData }
+    localStorage.setItem('user', JSON.stringify(user.value))
+  }
+
+  const getUserInfo = async () => {
+    const data =  await authApi.getUserInfo()
+    return data
+  }
+
+  return {
+    token,
+    user,
+    guestId,
+    guestNickname,
+    isGuest,
+    isLoggedIn,
+    currentNickname,
+    currentUserId,
+    currentGuestId,
+    initGuest,
+    setGuestNickname,
+    login,
+    register,
+    logout,
+    updateUser,
+    getUserInfo
   }
 })
