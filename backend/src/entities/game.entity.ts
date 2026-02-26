@@ -1,16 +1,19 @@
 import {
   Entity,
-  Column,
   PrimaryGeneratedColumn,
-  CreateDateColumn,
+  Column,
   ManyToOne,
   OneToMany,
+  CreateDateColumn,
+  UpdateDateColumn,
+  Index,
 } from 'typeorm';
 import { User } from './user.entity';
 import { GamePlayer } from './game-player.entity';
-import { GameRecord } from './game-record.entity';
+import { Record } from './record.entity';
 
-@Entity('games')
+@Entity()
+@Index(['userId', 'createdAt']) // 添加索引优化查询
 export class Game {
   @PrimaryGeneratedColumn()
   id: number;
@@ -18,30 +21,30 @@ export class Game {
   @Column({ unique: true })
   roomCode: string;
 
-  @Column({ nullable: true })
-  creatorId: number | null; // 修改类型，添加 | null
-
   @Column()
-  gameType: string;
+  name: string;
 
-  @Column({ default: 'playing' })
+  @Column('decimal', { precision: 10, scale: 2 })
+  buyIn: number;
+
+  @Column({ default: 'active' })
   status: string;
 
   @Column({ nullable: true })
-  note: string | null; // 添加 | null
+  userId: number;
 
-  @CreateDateColumn()
-  createdAt: Date;
-
-  @Column({ nullable: true, type: 'datetime' })
-  settledAt: Date | null; // 添加 | null
-
-  @ManyToOne(() => User, { nullable: true })
-  creator: User | null; // 添加 | null
+  @ManyToOne(() => User, (user) => user.games)
+  user: User;
 
   @OneToMany(() => GamePlayer, (player) => player.game, { cascade: true })
   players: GamePlayer[];
 
-  @OneToMany(() => GameRecord, (record) => record.game, { cascade: true })
-  records: GameRecord[];
+  @OneToMany(() => Record, (record) => record.game, { cascade: true })
+  records: Record[];
+
+  @CreateDateColumn()
+  createdAt: Date;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
 }

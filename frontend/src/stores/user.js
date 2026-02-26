@@ -1,95 +1,52 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
-import { authApi } from '../api/auth'
+import { ref } from 'vue'
+import request from '../api/request'
+import { Toast } from 'vant'
 
 export const useUserStore = defineStore('user', () => {
   const token = ref(localStorage.getItem('token') || '')
-  const user = ref(JSON.parse(localStorage.getItem('user') || 'null'))
-  const guestId = ref(localStorage.getItem('guestId') || '')
-  const guestNickname = ref(localStorage.getItem('guestNickname') || '')
+  const user = ref(null)
 
-  // 是否是游客
-  const isGuest = computed(() => !token.value && !!guestId.value)
+  // 注册
+  const register = async (username, password) => {
+    try {
+      const res = await request.post('/auth/register', { username, password })
 
-  // 是否已登录
-  const isLoggedIn = computed(() => !!token.value)
+      if (res.data.access_token) {
+        token.value = res.data.access_token
+        user.value = res.data.user
+        localStorage.setItem('token', token.value)
 
-  // 当前昵称
-  const currentNickname = computed(() => {
-    if (user.value?.nickname) return user.value.nickname
-    if (guestNickname.value) return guestNickname.value
-    return '游客'
-  })
+        Toast.success('注册成功')
 
-  // 当前用户ID（用于后端）
-  const currentUserId = computed(() => user.value?.id || null)
+        // 自动迁移游客数据
+        await migrateGuestData()
 
-  // 当前游客ID（用于后端）
-  const currentGuestId = computed(() => guestId.value || null)
-
-  // userInfo 别名（兼容 Profile.vue 使用）
-  const userInfo = computed(() => user.value)
-
-  // 初始化游客
-  const initGuest = () => {
-    if (!guestId.value) {
-      // 生成 UUID
-      const uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-        const r = (Math.random() * 16) | 0
-        const v = c === 'x' ? r : (r & 0x3) | 0x8
-        return v.toString(16)
-      })
-      guestId.value = uuid
-      localStorage.setItem('guestId', uuid)
+        return true
+      }
+    } catch (error) {
+      Toast.fail(error.response?.data?.message || '注册失败')
+      return false
     }
-
-    if (!guestNickname.value) {
-      const nickname = `游客${Math.floor(Math.random() * 10000)}`
-      guestNickname.value = nickname
-      localStorage.setItem('guestNickname', nickname)
-    }
-  }
-
-  // 设置游客昵称
-  const setGuestNickname = nickname => {
-    guestNickname.value = nickname
-    localStorage.setItem('guestNickname', nickname)
   }
 
   // 登录
   const login = async (username, password) => {
-    const data = await authApi.login({ username, password })
-    token.value = data.token
-    user.value = data.user
-    localStorage.setItem('token', data.token)
-    localStorage.setItem('user', JSON.stringify(data.user))
+    try {
+      const res = await request.post('/auth/login', { username, password })
 
-    // 登录后清除游客信息（数据已迁移）
-    localStorage.removeItem('guestId')
-    localStorage.removeItem('guestNickname')
-    guestId.value = ''
-    guestNickname.value = ''
-  }
+      if (res.data.access_token) {
+        token.value = res.data.access_token
+        user.value = res.data.user
+        localStorage.setItem('token', token.value)
 
-  // 注册
-  const register = async (username, password, nickname) => {
-    // 注册时携带 guestId，后端会自动迁移数据
-    const data = await authApi.register({
-      username,
-      password,
-      nickname,
-      guestId: guestId.value
-    })
-    token.value = data.token
-    user.value = data.user
-    localStorage.setItem('token', data.token)
-    localStorage.setItem('user', JSON.stringify(data.user))
-
-    // 注册后清除游客信息
-    localStorage.removeItem('guestId')
-    localStorage.removeItem('guestNickname')
-    guestId.value = ''
-    guestNickname.value = ''
+        Toast.success('登录成功')
+        return true
+      }
+    } catch (error) {
+      Toast.fail(error.response?.data?.message || '登录失败')
+      return false
+    }
   }
 
   // 登出
@@ -97,52 +54,54 @@ export const useUserStore = defineStore('user', () => {
     token.value = ''
     user.value = null
     localStorage.removeItem('token')
-    localStorage.removeItem('user')
-
-    // 重新初始化游客
-    initGuest()
+    Toast.success('已退出登录')
   }
 
-  // 更新用户信息（本地）
-  const updateUser = userData => {
-    user.value = { ...user.value, ...userData }
-    localStorage.setItem('user', JSON.stringify(user.value))
-  }
+  // 迁移游客数据
+  const migrateGuestData = async () => {
+    const guestGamesStr = localStorage.getItem('guestGames')
 
-  // 更新昵称（调用后端接口）
-  const updateNickname = async nickname => {
-    if (isGuest.value) {
-      setGuestNickname(nickname)
+    if (!guestGamesStr) {
       return
     }
-    const data = await authApi.updateProfile({ nickname })
-    updateUser({ nickname: data.nickname })
-  }
 
-  const getUserInfo = async () => {
-    const data = await authApi.getUserInfo()
-    updateUser(data)
-    return data
+    try {
+      const guestGames = JSON.parse(guestGamesStr)
+
+      if (!guestGames || guestGames.length === 0) {
+        return
+      }
+
+      Toast.loading({
+        message: '正在迁移数据...',
+        forbidClick: true,
+        duration: 0
+      })
+
+      const res = await request.post('/auth/migrate', { games: guestGames })
+
+      Toast.clear()
+
+      if (res.data.migratedCount > 0) {
+        // 迁移成功后清空本地数据
+        localStorage.removeItem('guestGames')
+        Toast.success(`成功迁移 ${res.data.migratedCount} 个游戏`)
+      } else {
+        Toast.fail('数据迁移失败')
+      }
+    } catch (error) {
+      Toast.clear()
+      console.error('数据迁移失败:', error)
+      Toast.fail(error.response?.data?.message || '数据迁移失败')
+    }
   }
 
   return {
     token,
     user,
-    userInfo,
-    guestId,
-    guestNickname,
-    isGuest,
-    isLoggedIn,
-    currentNickname,
-    currentUserId,
-    currentGuestId,
-    initGuest,
-    setGuestNickname,
-    login,
     register,
+    login,
     logout,
-    updateUser,
-    updateNickname,
-    getUserInfo
+    migrateGuestData
   }
 })

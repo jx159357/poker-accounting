@@ -8,149 +8,170 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { User } from '../entities/user.entity';
+import { Game } from '../entities/game.entity';
 import { GamePlayer } from '../entities/game-player.entity';
+import { Record } from '../entities/record.entity';
+import { RegisterDto } from './dto/register.dto';
+import { LoginDto } from './dto/login.dto';
+import { MigrateDto } from './dto/migrate.dto';
 
 @Injectable()
 export class AuthService {
   constructor(
     @InjectRepository(User)
     private userRepository: Repository<User>,
+    @InjectRepository(Game)
+    private gameRepository: Repository<Game>,
     @InjectRepository(GamePlayer)
-    private playerRepository: Repository<GamePlayer>,
+    private gamePlayerRepository: Repository<GamePlayer>,
+    @InjectRepository(Record)
+    private recordRepository: Repository<Record>,
     private jwtService: JwtService,
   ) {}
 
-  async register(
-    username: string,
-    password: string,
-    nickname: string,
-    guestId?: string,
-  ) {
-    // 检查用户名是否已存在
+  async register(registerDto: RegisterDto) {
     const existingUser = await this.userRepository.findOne({
-      where: { username },
+      where: { username: registerDto.username },
     });
+
     if (existingUser) {
       throw new ConflictException('用户名已存在');
     }
 
     // 加密密码
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = await bcrypt.hash(registerDto.password, 10);
 
-    // 创建用户
     const user = this.userRepository.create({
-      username,
+      username: registerDto.username,
       password: hashedPassword,
-      nickname,
     });
 
     await this.userRepository.save(user);
 
-    // 如果有 guestId，迁移游客数据
-    if (guestId) {
-      await this.migrateGuestData(guestId, user.id);
-    }
-
-    // 生成 token
-    const token = this.jwtService.sign({
-      id: user.id,
-      username: user.username,
-    });
-
+    const payload = { username: user.username, sub: user.id };
     return {
-      token,
+      access_token: this.jwtService.sign(payload),
       user: {
         id: user.id,
         username: user.username,
-        nickname: user.nickname,
       },
     };
   }
 
-  async login(username: string, password: string) {
-    // 查找用户
+  async login(loginDto: LoginDto) {
+    const user = await this.validateUser(loginDto.username, loginDto.password);
+
+    if (!user) {
+      throw new UnauthorizedException('用户名或密码错误');
+    }
+
+    const payload = { username: user.username, sub: user.id };
+    return {
+      access_token: this.jwtService.sign(payload),
+      user: {
+        id: user.id,
+        username: user.username,
+      },
+    };
+  }
+
+  async validateUser(username: string, password: string) {
     const user = await this.userRepository.findOne({ where: { username } });
-    if (!user) {
-      throw new UnauthorizedException('用户名或密码错误');
+
+    if (user && (await bcrypt.compare(password, user.password))) {
+      const { password, ...result } = user;
+      return result;
     }
 
-    // 验证密码
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid) {
-      throw new UnauthorizedException('用户名或密码错误');
-    }
-
-    // 生成 token
-    const token = this.jwtService.sign({
-      id: user.id,
-      username: user.username,
-    });
-
-    return {
-      token,
-      user: {
-        id: user.id,
-        username: user.username,
-        nickname: user.nickname,
-      },
-    };
+    return null;
   }
 
-  // 获取用户信息
-  async getUserInfo(userId: number) {
+  // 新增：游客数据迁移
+  async migrate(userId: number, migrateDto: MigrateDto) {
     const user = await this.userRepository.findOne({ where: { id: userId } });
+
     if (!user) {
       throw new UnauthorizedException('用户不存在');
     }
 
+    const migratedGames = [];
+
+    for (const guestGame of migrateDto.games) {
+      try {
+        // 生成唯一房间码
+        const roomCode = this.generateRoomCode();
+
+        // 创建游戏
+        const game = this.gameRepository.create({
+          roomCode,
+          name: guestGame.name,
+          buyIn: guestGame.buyIn,
+          userId: user.id,
+          status: guestGame.status || 'completed',
+          createdAt: guestGame.createdAt
+            ? new Date(guestGame.createdAt)
+            : new Date(),
+        });
+
+        await this.gameRepository.save(game);
+
+        // 创建玩家映射表
+        const playerIdMap = new Map<string, number>();
+
+        // 插入玩家数据
+        for (const playerName of guestGame.players) {
+          const player = this.gamePlayerRepository.create({
+            name: playerName,
+            gameId: game.id,
+          });
+          await this.gamePlayerRepository.save(player);
+          playerIdMap.set(playerName, player.id);
+        }
+
+        // 插入记录数据
+        for (const record of guestGame.records) {
+          const dbPlayerId = playerIdMap.get(record.playerId);
+
+          if (dbPlayerId) {
+            const newRecord = this.recordRepository.create({
+              gameId: game.id,
+              playerId: dbPlayerId,
+              amount: record.amount,
+              type: record.type,
+              createdAt: record.createdAt
+                ? new Date(record.createdAt)
+                : new Date(),
+            });
+            await this.recordRepository.save(newRecord);
+          }
+        }
+
+        migratedGames.push({
+          guestId: guestGame.id,
+          dbId: game.id,
+          roomCode: game.roomCode,
+          name: game.name,
+        });
+      } catch (error) {
+        console.error(`迁移游戏 ${guestGame.name} 失败:`, error);
+      }
+    }
+
     return {
-      id: user.id,
-      username: user.username,
-      nickname: user.nickname,
-      createdAt: user.createdAt,
+      message: '数据迁移成功',
+      migratedCount: migratedGames.length,
+      totalCount: migrateDto.games.length,
+      games: migratedGames,
     };
   }
 
-  // 更新用户资料
-  async updateProfile(userId: number, nickname: string) {
-    const user = await this.userRepository.findOne({ where: { id: userId } });
-    if (!user) {
-      throw new UnauthorizedException('用户不存在');
+  // 生成6位房间码
+  private generateRoomCode(): string {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let code = '';
+    for (let i = 0; i < 6; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
     }
-
-    user.nickname = nickname;
-    await this.userRepository.save(user);
-
-    return {
-      id: user.id,
-      username: user.username,
-      nickname: user.nickname,
-    };
-  }
-
-  // 迁移游客数据到正式用户
-  private async migrateGuestData(guestId: string, userId: number) {
-    // 查找所有游客的游戏记录
-    const guestPlayers = await this.playerRepository.find({
-      where: { guestId },
-      relations: ['game'],
-    });
-
-    // 更新为正式用户
-    for (const player of guestPlayers) {
-      player.userId = userId;
-      player.guestId = null; // 清除 guestId
-      await this.playerRepository.save(player);
-    }
-
-    console.log(`成功迁移 ${guestPlayers.length} 条游客数据到用户 ${userId}`);
-  }
-
-  async validateUser(userId: number) {
-    const user = await this.userRepository.findOne({ where: { id: userId } });
-    if (!user) {
-      throw new UnauthorizedException('用户不存在');
-    }
-    return user;
+    return code;
   }
 }

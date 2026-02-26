@@ -1,14 +1,7 @@
-import {
-  Entity,
-  Column,
-  PrimaryGeneratedColumn,
-  ManyToOne,
-  CreateDateColumn,
-} from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from 'typeorm';
 import { Game } from './game.entity';
-import { GamePlayer } from './game-player.entity';
 
-@Entity('game_records')
+@Entity()
 export class GameRecord {
   @PrimaryGeneratedColumn()
   id: number;
@@ -16,30 +9,9 @@ export class GameRecord {
   @Column()
   gameId: number;
 
-  @Column()
-  fromPlayerId: number;
-
-  @Column()
-  toPlayerId: number;
-
-  @Column({ type: 'decimal', precision: 10, scale: 2 })
-  amount: number;
-
   @Column({ nullable: true })
-  note: string | null; // 添加 | null
+  guestId: string;
 
-  @Column({ default: false })
-  isDeleted: boolean;
-
-  @CreateDateColumn()
-  createdAt: Date;
-
-  @ManyToOne(() => Game, (game) => game.records)
+  @ManyToOne(() => Game)
   game: Game;
-
-  @ManyToOne(() => GamePlayer)
-  fromPlayer: GamePlayer;
-
-  @ManyToOne(() => GamePlayer)
-  toPlayer: GamePlayer;
 }

@@ -1,14 +1,9 @@
-import {
-  Controller,
-  Post,
-  Body,
-  Get,
-  Put,
-  UseGuards,
-  Request,
-} from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Request } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
-import { AuthGuard } from './auth.guard';
+import { RegisterDto } from './dto/register.dto';
+import { LoginDto } from './dto/login.dto';
+import { MigrateDto } from './dto/migrate.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
 
 @Controller('auth')
@@ -16,37 +11,20 @@ export class AuthController {
   constructor(private authService: AuthService) {}
 
   @Post('register')
-  async register(
-    @Body()
-    body: {
-      username: string;
-      password: string;
-      nickname: string;
-      guestId?: string;
-    },
-  ) {
-    return this.authService.register(
-      body.username,
-      body.password,
-      body.nickname,
-      body.guestId,
-    );
+  @Throttle({ default: { limit: 3, ttl: 60000 } })
+  async register(@Body() registerDto: RegisterDto) {
+    return this.authService.register(registerDto);
   }
 
   @Post('login')
-  async login(@Body() body: { username: string; password: string }) {
-    return this.authService.login(body.username, body.password);
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  async login(@Body() loginDto: LoginDto) {
+    return this.authService.login(loginDto);
   }
 
-  @UseGuards(AuthGuard)
-  @Get('me')
-  async getProfile(@Request() req) {
-    return this.authService.getUserInfo(req.user.id);
-  }
-
+  @Post('migrate')
   @UseGuards(JwtAuthGuard)
-  @Put('profile')
-  async updateProfile(@Request() req, @Body() body: { nickname: string }) {
-    return this.authService.updateProfile(req.user.id, body.nickname);
+  async migrate(@Request() req, @Body() migrateDto: MigrateDto) {
+    return this.authService.migrate(req.user.userId, migrateDto);
   }
 }

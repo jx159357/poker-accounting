@@ -1,14 +1,16 @@
 import {
   Entity,
-  Column,
   PrimaryGeneratedColumn,
-  CreateDateColumn,
+  Column,
   ManyToOne,
+  CreateDateColumn,
+  Index,
 } from 'typeorm';
-import { User } from './user.entity';
 import { Game } from './game.entity';
+import { GamePlayer } from './game-player.entity';
 
-@Entity('records')
+@Entity()
+@Index(['gameId', 'createdAt']) // 添加索引优化查询
 export class Record {
   @PrimaryGeneratedColumn()
   id: number;
@@ -17,20 +19,20 @@ export class Record {
   gameId: number;
 
   @Column()
-  userId: number;
+  playerId: number;
 
   @Column('decimal', { precision: 10, scale: 2 })
-  amount: number; // 正数赢，负数输
+  amount: number;
 
-  @Column({ nullable: true })
-  playerName: string; // 玩家名称
-
-  @CreateDateColumn()
-  createdAt: Date;
+  @Column()
+  type: string;
 
   @ManyToOne(() => Game, (game) => game.records)
   game: Game;
 
-  @ManyToOne(() => User, (user) => user.records)
-  user: User;
+  @ManyToOne(() => GamePlayer, (player) => player.records)
+  player: GamePlayer;
+
+  @CreateDateColumn()
+  createdAt: Date;
 }

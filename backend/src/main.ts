@@ -1,15 +1,22 @@
 import { NestFactory } from '@nestjs/core';
+import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  app.enableCors({
-    origin: true, // 允许所有来源（开发环境）
-    credentials: true,
-  });
+  app.enableCors();
+
+  // 启用全局验证管道
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  );
 
   await app.listen(3000);
-  console.log('后端服务运行在: http://localhost:3000');
+  console.log('端口运行在3000')
 }
 bootstrap();

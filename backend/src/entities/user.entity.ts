@@ -1,14 +1,7 @@
-import {
-  Entity,
-  Column,
-  PrimaryGeneratedColumn,
-  CreateDateColumn,
-  OneToMany,
-} from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
 import { Game } from './game.entity';
-import { Record } from './record.entity';
 
-@Entity('users')
+@Entity()
 export class User {
   @PrimaryGeneratedColumn()
   id: number;
@@ -19,15 +12,6 @@ export class User {
   @Column()
   password: string;
 
-  @Column()
-  nickname: string;
-
-  @CreateDateColumn()
-  createdAt: Date;
-
-  @OneToMany(() => Game, (game) => game.creator) // 修改这里
+  @OneToMany(() => Game, (game) => game.user)
   games: Game[];
-
-  @OneToMany(() => Record, (record) => record.user)
-  records: Record[];
 }
