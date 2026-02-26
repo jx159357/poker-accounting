@@ -1,0 +1,7 @@
+{
+  "tool_name": "Read",
+  "tool_input_preview": "{\"file_path\":\"C:\\\\Users\\\\Administrator\\\\.claude\\\\projects\\\\D--demo-jx-github-poker-accounting\\\\memory\\\\MEMORY.md\"}",
+  "error": "File does not exist. Note: your current working directory is D:\\demo_jx\\github\\poker-accounting.",
+  "timestamp": "2026-02-26T07:38:56.102Z",
+  "retry_count": 1
+}

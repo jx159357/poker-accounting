@@ -14,5 +14,10 @@ export const authApi = {
   // 获取用户信息
   getUserInfo() {
     return request.get('/auth/me')
+  },
+
+  // 更新个人资料（昵称）
+  updateProfile(data) {
+    return request.put('/auth/profile', data)
   }
 }

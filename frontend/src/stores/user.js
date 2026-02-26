@@ -27,6 +27,9 @@ export const useUserStore = defineStore('user', () => {
   // 当前游客ID（用于后端）
   const currentGuestId = computed(() => guestId.value || null)
 
+  // userInfo 别名（兼容 Profile.vue 使用）
+  const userInfo = computed(() => user.value)
+
   // 初始化游客
   const initGuest = () => {
     if (!guestId.value) {
@@ -100,20 +103,32 @@ export const useUserStore = defineStore('user', () => {
     initGuest()
   }
 
-  // 更新用户信息
+  // 更新用户信息（本地）
   const updateUser = userData => {
     user.value = { ...user.value, ...userData }
     localStorage.setItem('user', JSON.stringify(user.value))
   }
 
+  // 更新昵称（调用后端接口）
+  const updateNickname = async nickname => {
+    if (isGuest.value) {
+      setGuestNickname(nickname)
+      return
+    }
+    const data = await authApi.updateProfile({ nickname })
+    updateUser({ nickname: data.nickname })
+  }
+
   const getUserInfo = async () => {
-    const data =  await authApi.getUserInfo()
+    const data = await authApi.getUserInfo()
+    updateUser(data)
     return data
   }
 
   return {
     token,
     user,
+    userInfo,
     guestId,
     guestNickname,
     isGuest,
@@ -127,6 +142,7 @@ export const useUserStore = defineStore('user', () => {
     register,
     logout,
     updateUser,
+    updateNickname,
     getUserInfo
   }
 })

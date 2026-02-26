@@ -101,7 +101,7 @@
           <div v-for="record in displayRecords" :key="record.id" class="record-item">
             <div class="record-info">
               <span class="record-players">
-                {{ getPlayerName(record.fromPlayerId) }} → {{ getPlayerName(record.toPlayerId) }}
+                {{ record.fromPlayer?.nickname || '未知' }} → {{ record.toPlayer?.nickname || '未知' }}
               </span>
               <span class="record-time">{{ formatTime(record.createdAt) }}</span>
             </div>
@@ -138,7 +138,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { showToast, showConfirmDialog, showLoadingToast, closeToast } from 'vant'
 import { useUserStore } from '../stores/user'
 import { gameApi } from '../api/game'
-import { getNameInitial } from '../utils/nameGenerator'
+import { getNameInitial, getAvatarColorByString } from '../utils/nameGenerator'
 
 const router = useRouter()
 const route = useRoute()
@@ -166,7 +166,7 @@ const menuActions = [
 
 const isMe = player => {
   if (userStore.isGuest) {
-    return player.guestId === userStore.currentUserId
+    return player.guestId === userStore.currentGuestId
   } else {
     return player.userId === userStore.userInfo?.id
   }
@@ -177,17 +177,10 @@ const getInitial = nickname => {
 }
 
 const getAvatarStyle = player => {
-  try {
-    const avatarData = JSON.parse(player.avatar)
-    return {
-      background: avatarData.bg,
-      color: avatarData.text
-    }
-  } catch {
-    return {
-      background: '#dcdee0',
-      color: '#fff'
-    }
+  const color = getAvatarColorByString(player.nickname)
+  return {
+    background: color.bg,
+    color: color.text
   }
 }
 
@@ -202,11 +195,6 @@ const formatScore = score => {
   const num = parseFloat(score)
   if (num > 0) return `+${num}`
   return num.toString()
-}
-
-const getPlayerName = playerId => {
-  const player = game.value?.players.find(p => p.id === playerId)
-  return player?.nickname || '未知'
 }
 
 const formatTime = timestamp => {
@@ -309,7 +297,7 @@ const confirmFinish = async () => {
 
     showLoadingToast({ message: '结算中...', forbidClick: true })
 
-    await gameApi.settleRoom(roomCode, false)
+    await gameApi.finishRoom(roomCode)
 
     closeToast()
     showToast('房间已结束')

@@ -67,6 +67,7 @@ export class GameService {
       roomCode,
       gameType,
       status: 'playing',
+      creatorId: userId || null,
     });
 
     await this.gameRepository.save(game);
@@ -162,7 +163,6 @@ export class GameService {
       .createQueryBuilder('player')
       .leftJoinAndSelect('player.game', 'game')
       .leftJoinAndSelect('game.players', 'players')
-      .where('game.status != :status', { status: 'finished' })
       .orderBy('game.createdAt', 'DESC');
 
     if (userId) {

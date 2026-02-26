@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { showToast, showLoadingToast, closeToast, showDialog } from 'vant'
+import { showToast, showLoadingToast, closeToast } from 'vant'
 import { useUserStore } from '../stores/user'
 import { gameApi } from '../api/game'
 
@@ -119,32 +119,34 @@ const getStatusType = status => {
 const goProfile = () => {
   router.push('/profile')
 }
-
 // 修改昵称
 const changeNickname = () => {
   if (userStore.isGuest) {
     showDialog({
       title: '修改昵称',
-      message: '请输入新昵称',
+      message: `<input type="text" id="nicknameInput" placeholder="请输入新昵称" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;">`,
+      allowHtml: true,
       showCancelButton: true,
-      beforeClose: (action, done) => {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      beforeClose: action => {
         if (action === 'confirm') {
-          const input = document.querySelector('.van-dialog__message input')
+          const input = document.getElementById('nicknameInput')
           const nickname = input?.value?.trim()
-          if (nickname) {
-            userStore.setGuestNickname(nickname)
-            showToast('修改成功')
-            done()
-          } else {
+
+          if (!nickname) {
             showToast('请输入昵称')
-            done(false)
+            return false
           }
-        } else {
-          done(false)
+
+          // 修改昵称的逻辑
+          userStore.setGuestNickname(nickname)
+          showToast('修改成功')
+          return true
         }
+        return true
       }
     }).then(() => {
-      // 刷新页面
       loadMyGames()
     })
   } else {
