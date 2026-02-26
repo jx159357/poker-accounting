@@ -1,107 +1,86 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
-import request from '../api/request'
-import { Toast } from 'vant'
+import { ref, computed } from 'vue'
+import { authApi } from '../api/auth'
 
 export const useUserStore = defineStore('user', () => {
   const token = ref(localStorage.getItem('token') || '')
-  const user = ref(null)
+  const username = ref(localStorage.getItem('username') || '')
+  const isGuestMode = ref(localStorage.getItem('guestMode') === 'true')
+  const loading = ref(false)
 
-  // 注册
-  const register = async (username, password) => {
-    try {
-      const res = await request.post('/auth/register', { username, password })
-
-      if (res.data.access_token) {
-        token.value = res.data.access_token
-        user.value = res.data.user
-        localStorage.setItem('token', token.value)
-
-        Toast.success('注册成功')
-
-        // 自动迁移游客数据
-        await migrateGuestData()
-
-        return true
-      }
-    } catch (error) {
-      Toast.fail(error.response?.data?.message || '注册失败')
-      return false
-    }
-  }
+  const isLoggedIn = computed(() => !!token.value && !isGuestMode.value)
+  const isGuest = computed(() => isGuestMode.value)
 
   // 登录
-  const login = async (username, password) => {
+  const login = async (user, pass) => {
+    loading.value = true
     try {
-      const res = await request.post('/auth/login', { username, password })
+      const data = await authApi.login(user, pass)
+      token.value = data.access_token
+      username.value = user
+      isGuestMode.value = false
 
-      if (res.data.access_token) {
-        token.value = res.data.access_token
-        user.value = res.data.user
-        localStorage.setItem('token', token.value)
-
-        Toast.success('登录成功')
-        return true
-      }
+      localStorage.setItem('token', data.access_token)
+      localStorage.setItem('username', user)
+      localStorage.removeItem('guestMode')
     } catch (error) {
-      Toast.fail(error.response?.data?.message || '登录失败')
-      return false
+      throw error
+    } finally {
+      loading.value = false
     }
   }
 
-  // 登出
+  // 注册
+  const register = async (user, pass) => {
+    loading.value = true
+    try {
+      const data = await authApi.register(user, pass)
+      token.value = data.access_token
+      username.value = user
+      isGuestMode.value = false
+
+      localStorage.setItem('token', data.access_token)
+      localStorage.setItem('username', user)
+      localStorage.removeItem('guestMode')
+    } catch (error) {
+      throw error
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // 退出登录
   const logout = () => {
     token.value = ''
-    user.value = null
+    username.value = ''
+    isGuestMode.value = false
+
     localStorage.removeItem('token')
-    Toast.success('已退出登录')
+    localStorage.removeItem('username')
+    localStorage.removeItem('guestMode')
   }
 
-  // 迁移游客数据
-  const migrateGuestData = async () => {
-    const guestGamesStr = localStorage.getItem('guestGames')
+  // 设置游客模式
+  const setGuestMode = () => {
+    token.value = ''
+    username.value = ''
+    isGuestMode.value = true
 
-    if (!guestGamesStr) {
-      return
-    }
-
-    try {
-      const guestGames = JSON.parse(guestGamesStr)
-
-      if (!guestGames || guestGames.length === 0) {
-        return
-      }
-
-      Toast.loading({
-        message: '正在迁移数据...',
-        forbidClick: true,
-        duration: 0
-      })
-
-      const res = await request.post('/auth/migrate', { games: guestGames })
-
-      Toast.clear()
-
-      if (res.data.migratedCount > 0) {
-        // 迁移成功后清空本地数据
-        localStorage.removeItem('guestGames')
-        Toast.success(`成功迁移 ${res.data.migratedCount} 个游戏`)
-      } else {
-        Toast.fail('数据迁移失败')
-      }
-    } catch (error) {
-      Toast.clear()
-      console.error('数据迁移失败:', error)
-      Toast.fail(error.response?.data?.message || '数据迁移失败')
-    }
+    localStorage.setItem('guestMode', 'true')
+    localStorage.removeItem('token')
+    localStorage.removeItem('username')
   }
 
   return {
     token,
-    user,
-    register,
+    username,
+    isGuestMode,
+    loading,
+    isLoggedIn,
+    isGuest,
     login,
+    register,
     logout,
-    migrateGuestData
+    setGuestMode
   }
 })

@@ -1,43 +1,70 @@
-import request from '../utils/request'
+import axios from 'axios'
 
-export const gameApi = {
-  // 创建房间
-  createRoom(data) {
-    return request.post('/game/create', data)
-  },
+const API_URL = 'http://localhost:3000'
 
-  // 加入房间
-  joinRoom(data) {
-    return request.post('/game/join', data)
-  },
+// 获取 token
+const getToken = () => localStorage.getItem('token')
 
-  // 获取房间详情
-  getRoomDetail(roomCode) {
-    return request.get(`/game/${roomCode}`)
-  },
+// 创建游戏
+export const createGame = async (name, buyIn, smallBlind, bigBlind) => {
+  const response = await axios.post(
+    `${API_URL}/game/create`,
+    { name, buyIn, smallBlind, bigBlind },
+    { headers: { Authorization: `Bearer ${getToken()}` } }
+  )
+  return response.data
+}
 
-  // 获取我的房间列表
-  getMyGames() {
-    return request.get('/game/my-games')
-  },
+// 加入游戏
+export const joinGame = async roomCode => {
+  const response = await axios.post(
+    `${API_URL}/game/join/${roomCode}`,
+    {},
+    { headers: { Authorization: `Bearer ${getToken()}` } }
+  )
+  return response.data
+}
 
-  // 添加记分记录
-  addScore(roomCode, data) {
-    return request.post(`/game/${roomCode}/score`, data)
-  },
+// 获取我的游戏列表
+export const getMyGames = async () => {
+  const response = await axios.get(`${API_URL}/game/my-games`, {
+    headers: { Authorization: `Bearer ${getToken()}` }
+  })
+  return response.data
+}
 
-  // 撤销记录
-  undoRecord(roomCode, recordId) {
-    return request.delete(`/game/${roomCode}/record/${recordId}`)
-  },
+// 获取游戏详情
+export const getGameDetail = async roomCode => {
+  const response = await axios.get(`${API_URL}/game/${roomCode}`, {
+    headers: { Authorization: `Bearer ${getToken()}` }
+  })
+  return response.data
+}
 
-  // 结算本局（不清空记录）
-  settleRound(roomCode) {
-    return request.post(`/game/${roomCode}/settle`, { clearRecords: false })
-  },
+// 结束游戏
+export const endGame = async roomCode => {
+  const response = await axios.post(
+    `${API_URL}/game/${roomCode}/end`,
+    {},
+    { headers: { Authorization: `Bearer ${getToken()}` } }
+  )
+  return response.data
+}
 
-  // 结束房间（清空记录）
-  finishRoom(roomCode) {
-    return request.post(`/game/${roomCode}/finish`)
-  }
+// 添加记录
+export const addRecord = async (roomCode, amount, type) => {
+  const response = await axios.post(
+    `${API_URL}/game/${roomCode}/record`,
+    { amount, type },
+    { headers: { Authorization: `Bearer ${getToken()}` } }
+  )
+  return response.data
+}
+
+// 撤销记录
+export const undoRecord = async (roomCode, recordId) => {
+  const response = await axios.delete(`${API_URL}/game/${roomCode}/record/${recordId}`, {
+    headers: { Authorization: `Bearer ${getToken()}` }
+  })
+  return response.data
 }

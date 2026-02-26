@@ -1,100 +1,100 @@
 <template>
-  <div class="login-page">
-    <div class="header">
-      <h1>打牌记账</h1>
-      <p>欢迎回来</p>
-    </div>
-
-    <van-form @submit="onSubmit">
-      <van-cell-group inset>
-        <van-field
-          v-model="username"
-          name="username"
-          label="用户名"
-          placeholder="请输入用户名"
-          :rules="[{ required: true, message: '请输入用户名' }]"
-        />
-        <van-field
-          v-model="password"
-          type="password"
-          name="password"
-          label="密码"
-          placeholder="请输入密码"
-          :rules="[{ required: true, message: '请输入密码' }]"
-        />
-      </van-cell-group>
-
-      <div class="button-group">
-        <van-button round block type="primary" native-type="submit" :loading="loading">
-          登录
-        </van-button>
-        <van-button round block plain type="primary" @click="goRegister">
-          注册账号
-        </van-button>
+  <div class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-8 animate-fade-in">
+      <div class="text-center mb-8">
+        <h1 class="text-3xl font-bold text-gray-800 mb-2">德州扑克记账</h1>
+        <p class="text-gray-600">登录您的账户</p>
       </div>
-    </van-form>
+
+      <form @submit.prevent="handleLogin" class="space-y-6">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">
+            用户名
+          </label>
+          <input
+            v-model="username"
+            type="text"
+            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+            placeholder="请输入用户名"
+            :disabled="userStore.loading"
+          />
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">
+            密码
+          </label>
+          <input
+            v-model="password"
+            type="password"
+            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+            placeholder="请输入密码"
+            :disabled="userStore.loading"
+          />
+        </div>
+
+        <button
+          type="submit"
+          :disabled="userStore.loading"
+          class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition font-medium disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center"
+        >
+          <Loading v-if="userStore.loading" size="small" text="" />
+          <span v-else>登录</span>
+        </button>
+      </form>
+
+      <div class="mt-6 text-center space-y-4">
+        <button
+          @click="handleGuestLogin"
+          :disabled="userStore.loading"
+          class="text-blue-600 hover:text-blue-800 text-sm font-medium disabled:text-gray-400"
+        >
+          游客模式进入
+        </button>
+
+        <div class="text-sm text-gray-600">
+          还没有账户？
+          <router-link to="/register" class="text-blue-600 hover:text-blue-800 font-medium ml-1">
+            立即注册
+          </router-link>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { showToast } from 'vant';
 import { useUserStore } from '../stores/user';
+import { useToastStore } from '../stores/toast';
+import Loading from '../components/Loading.vue';
 
 const router = useRouter();
 const userStore = useUserStore();
+const toastStore = useToastStore();
 
 const username = ref('');
 const password = ref('');
-const loading = ref(false);
 
-const onSubmit = async () => {
-  loading.value = true;
+const handleLogin = async () => {
+  if (!username.value.trim() || !password.value.trim()) {
+    toastStore.error('请输入用户名和密码');
+    return;
+  }
+
   try {
     await userStore.login(username.value, password.value);
-    showToast('登录成功');
+    toastStore.success('登录成功！');
     router.push('/home');
   } catch (error) {
-    showToast(error.response?.data?.message || '登录失败');
-  } finally {
-    loading.value = false;
+    toastStore.error(error.message || '登录失败，请检查用户名和密码');
   }
 };
 
-const goRegister = () => {
-  router.push('/register');
+const handleGuestLogin = () => {
+  userStore.setGuestMode();
+  toastStore.info('游客模式已启用');
+  router.push('/home');
 };
 </script>
-
-<style scoped>
-.login-page {
-  min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  padding: 60px 20px 20px;
-}
-
-.header {
-  text-align: center;
-  color: white;
-  margin-bottom: 60px;
-}
-
-.header h1 {
-  font-size: 32px;
-  margin-bottom: 10px;
-}
-
-.header p {
-  font-size: 16px;
-  opacity: 0.9;
-}
-
-.button-group {
-  padding: 20px 16px;
-}
-
-.button-group .van-button {
-  margin-bottom: 12px;
-}
-</style>

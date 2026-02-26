@@ -1,46 +1,66 @@
 <template>
-  <div class="register-page">
-    <van-nav-bar title="注册账号" left-arrow @click="$router.back()" fixed />
-
-    <div class="register-container">
-      <div class="tip-box">
-        <van-icon name="info-o" />
-        <span>注册后将保留您的游客数据</span>
+  <div class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-8 animate-fade-in">
+      <div class="text-center mb-8">
+        <h1 class="text-3xl font-bold text-gray-800 mb-2">创建账户</h1>
+        <p class="text-gray-600">注册新用户</p>
       </div>
 
-      <van-form @submit="onSubmit">
-        <van-cell-group inset>
-          <van-field
+      <form @submit.prevent="handleRegister" class="space-y-6">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">
+            用户名
+          </label>
+          <input
             v-model="username"
-            name="username"
-            label="账号"
-            placeholder="请输入账号"
-            :rules="[{ required: true, message: '请输入账号' }]"
+            type="text"
+            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+            placeholder="至少3个字符"
+            :disabled="userStore.loading"
           />
-          <van-field
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">
+            密码
+          </label>
+          <input
             v-model="password"
             type="password"
-            name="password"
-            label="密码"
-            placeholder="请输入密码"
-            :rules="[{ required: true, message: '请输入密码' }]"
+            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+            placeholder="至少6个字符"
+            :disabled="userStore.loading"
           />
-          <van-field
-            v-model="nickname"
-            name="nickname"
-            label="昵称"
-            :placeholder="`默认：${userStore.currentNickname}`"
-          />
-        </van-cell-group>
-        <div style="margin: 16px;">
-          <van-button round block type="primary" native-type="submit">
-            注册
-          </van-button>
         </div>
-      </van-form>
 
-      <div class="footer-link">
-        已有账号？<router-link to="/login">去登录</router-link>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">
+            确认密码
+          </label>
+          <input
+            v-model="confirmPassword"
+            type="password"
+            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+            placeholder="再次输入密码"
+            :disabled="userStore.loading"
+          />
+        </div>
+
+        <button
+          type="submit"
+          :disabled="userStore.loading"
+          class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition font-medium disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center"
+        >
+          <Loading v-if="userStore.loading" size="small" text="" />
+          <span v-else>注册</span>
+        </button>
+      </form>
+
+      <div class="mt-6 text-center text-sm text-gray-600">
+        已有账户？
+        <router-link to="/login" class="text-blue-600 hover:text-blue-800 font-medium ml-1">
+          立即登录
+        </router-link>
       </div>
     </div>
   </div>
@@ -49,68 +69,46 @@
 <script setup>
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { showToast, showLoadingToast, closeToast } from 'vant';
 import { useUserStore } from '../stores/user';
+import { useToastStore } from '../stores/toast';
+import Loading from '../components/Loading.vue';
 
 const router = useRouter();
 const userStore = useUserStore();
+const toastStore = useToastStore();
 
 const username = ref('');
 const password = ref('');
-const nickname = ref('');
+const confirmPassword = ref('');
 
-const onSubmit = async () => {
-  showLoadingToast({ message: '注册中...', forbidClick: true });
+const handleRegister = async () => {
+  // 表单验证
+  if (!username.value.trim() || !password.value.trim() || !confirmPassword.value.trim()) {
+    toastStore.error('请填写所有字段');
+    return;
+  }
+
+  if (username.value.length < 3) {
+    toastStore.error('用户名至少3个字符');
+    return;
+  }
+
+  if (password.value.length < 6) {
+    toastStore.error('密码至少6个字符');
+    return;
+  }
+
+  if (password.value !== confirmPassword.value) {
+    toastStore.error('两次密码输入不一致');
+    return;
+  }
 
   try {
-    await userStore.register(
-      username.value,
-      password.value,
-      nickname.value || userStore.currentNickname
-    );
-
-    closeToast();
-    showToast('注册成功');
+    await userStore.register(username.value, password.value);
+    toastStore.success('注册成功！');
     router.push('/home');
   } catch (error) {
-    closeToast();
-    showToast(error.response?.data?.message || '注册失败');
+    toastStore.error(error.message || '注册失败，用户名可能已存在');
   }
 };
 </script>
-
-<style scoped>
-.register-page {
-  min-height: 100vh;
-  background: #f7f8fa;
-}
-
-.register-container {
-  padding-top: 46px;
-  padding: 66px 16px 20px;
-}
-
-.tip-box {
-  background: #fff3cd;
-  border: 1px solid #ffc107;
-  border-radius: 8px;
-  padding: 12px;
-  margin-bottom: 16px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: #856404;
-  font-size: 14px;
-}
-
-.footer-link {
-  text-align: center;
-  margin-top: 20px;
-  color: #969799;
-}
-
-.footer-link a {
-  color: #1989fa;
-  text-decoration: none;
-}
-</style>

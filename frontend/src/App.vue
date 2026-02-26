@@ -1,38 +1,22 @@
 <template>
   <router-view />
+
+  <!-- Toast 容器 -->
+  <div class="fixed top-4 right-4 z-50 space-y-2">
+    <Toast
+      v-for="toast in toastStore.toasts"
+      :key="toast.id"
+      :message="toast.message"
+      :type="toast.type"
+      :duration="toast.duration"
+      @close="toastStore.removeToast(toast.id)"
+    />
+  </div>
 </template>
 
 <script setup>
+import { useToastStore } from './stores/toast';
+import Toast from './components/Toast.vue';
+
+const toastStore = useToastStore();
 </script>
-
-<style>
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-html, body {
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-}
-
-#app {
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-}
-
-/* 隐藏滚动条但保持功能 */
-::-webkit-scrollbar {
-  width: 0;
-  height: 0;
-}
-
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-</style>

@@ -14,11 +14,4 @@ const pinia = createPinia()
 app.use(pinia)
 app.use(router)
 app.use(Vant)
-
-// 初始化用户状态
-const userStore = useUserStore()
-if (!userStore.isLoggedIn) {
-  userStore.initGuest()
-}
-
 app.mount('#app')
