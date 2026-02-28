@@ -9,30 +9,27 @@ import { User } from './entities/user.entity';
 import { Game } from './entities/game.entity';
 import { GamePlayer } from './entities/game-player.entity';
 import { GameRecord } from './entities/game-record.entity';
-import { Record } from './entities/record.entity';
+import { Transaction } from './entities/transaction.entity';
 
 @Module({
   imports: [
-    // 添加 ConfigModule，必须放在最前面
     ConfigModule.forRoot({
-      isGlobal: true, // 设置为全局模块，所有模块都可以使用
-      envFilePath: '.env', // 指定 .env 文件路径
+      isGlobal: true,
+      envFilePath: '.env',
     }),
-    // 添加限流模块
     ThrottlerModule.forRoot([
       {
-        ttl: 60000, // 60秒
-        limit: 10, // 最多10次请求
+        ttl: 60000,
+        limit: 10,
       },
     ]),
     TypeOrmModule.forRoot({
       type: 'sqlite',
       database: 'poker.db',
-      entities: [User, Game, GamePlayer, GameRecord, Record],
-      synchronize: false, // 改为 false，生产环境不要自动同步
-      logging: false, // 改为 false，减少日志输出
+      entities: [User, Game, GamePlayer, GameRecord, Transaction],
+      synchronize: true,
+      logging: false,
       extra: {
-        // 开启 WAL 模式
         pragma: [
           'journal_mode = WAL',
           'synchronous = NORMAL',
@@ -45,7 +42,6 @@ import { Record } from './entities/record.entity';
     GameModule,
   ],
   providers: [
-    // 全局启用限流守卫
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,

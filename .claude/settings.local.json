@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx nest:*)",
+      "Bash(npx vite:*)",
+      "Bash(npm install:*)",
+      "WebSearch",
+      "WebFetch(domain:docs.serv00.com)"
+    ]
+  }
+}

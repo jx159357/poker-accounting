@@ -10,8 +10,8 @@ import { Game } from './game.entity';
 import { GamePlayer } from './game-player.entity';
 
 @Entity()
-@Index(['gameId', 'createdAt']) // 添加索引优化查询
-export class Record {
+@Index(['gameId', 'createdAt'])
+export class Transaction {
   @PrimaryGeneratedColumn()
   id: number;
 
@@ -19,19 +19,25 @@ export class Record {
   gameId: number;
 
   @Column()
-  playerId: number;
+  fromPlayerId: number;
+
+  @Column()
+  toPlayerId: number;
 
   @Column('decimal', { precision: 10, scale: 2 })
   amount: number;
 
-  @Column()
-  type: string;
+  @Column({ default: '' })
+  remark: string;
 
-  @ManyToOne(() => Game, (game) => game.records)
+  @ManyToOne(() => Game, (game) => game.transactions)
   game: Game;
 
-  @ManyToOne(() => GamePlayer, (player) => player.records)
-  player: GamePlayer;
+  @ManyToOne(() => GamePlayer)
+  fromPlayer: GamePlayer;
+
+  @ManyToOne(() => GamePlayer)
+  toPlayer: GamePlayer;
 
   @CreateDateColumn()
   createdAt: Date;

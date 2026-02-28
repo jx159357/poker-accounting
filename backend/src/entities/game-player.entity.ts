@@ -3,10 +3,8 @@ import {
   PrimaryGeneratedColumn,
   Column,
   ManyToOne,
-  OneToMany,
 } from 'typeorm';
 import { Game } from './game.entity';
-import { Record } from './record.entity';
 
 @Entity()
 export class GamePlayer {
@@ -19,9 +17,18 @@ export class GamePlayer {
   @Column()
   gameId: number;
 
+  @Column({ nullable: true })
+  userId: number;
+
+  @Column({ nullable: true })
+  guestId: string;
+
+  @Column({ nullable: true })
+  avatar: string;
+
+  @Column('decimal', { precision: 10, scale: 2, default: 0 })
+  currentScore: number;
+
   @ManyToOne(() => Game, (game) => game.players)
   game: Game;
-
-  @OneToMany(() => Record, (record) => record.player)
-  records: Record[];
 }

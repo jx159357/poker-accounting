@@ -1,4 +1,13 @@
-import { Controller, Post, Body, UseGuards, Request } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  Put,
+  Body,
+  UseGuards,
+  Request,
+  Headers,
+} from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
@@ -12,14 +21,32 @@ export class AuthController {
 
   @Post('register')
   @Throttle({ default: { limit: 3, ttl: 60000 } })
-  async register(@Body() registerDto: RegisterDto) {
-    return this.authService.register(registerDto);
+  async register(
+    @Body() registerDto: RegisterDto,
+    @Headers('x-guest-id') guestId: string,
+  ) {
+    return this.authService.register(registerDto, guestId);
   }
 
   @Post('login')
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   async login(@Body() loginDto: LoginDto) {
     return this.authService.login(loginDto);
+  }
+
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  async getMe(@Request() req) {
+    if (!req.user) {
+      return { user: null };
+    }
+    return this.authService.getUserInfo(req.user.userId);
+  }
+
+  @Put('profile')
+  @UseGuards(JwtAuthGuard)
+  async updateProfile(@Request() req, @Body() body: { nickname?: string }) {
+    return this.authService.updateProfile(req.user.userId, body);
   }
 
   @Post('migrate')

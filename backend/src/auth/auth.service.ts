@@ -2,6 +2,7 @@ import {
   Injectable,
   UnauthorizedException,
   ConflictException,
+  NotFoundException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -10,7 +11,7 @@ import * as bcrypt from 'bcrypt';
 import { User } from '../entities/user.entity';
 import { Game } from '../entities/game.entity';
 import { GamePlayer } from '../entities/game-player.entity';
-import { Record } from '../entities/record.entity';
+import { Transaction } from '../entities/transaction.entity';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { MigrateDto } from './dto/migrate.dto';
@@ -24,12 +25,12 @@ export class AuthService {
     private gameRepository: Repository<Game>,
     @InjectRepository(GamePlayer)
     private gamePlayerRepository: Repository<GamePlayer>,
-    @InjectRepository(Record)
-    private recordRepository: Repository<Record>,
+    @InjectRepository(Transaction)
+    private transactionRepository: Repository<Transaction>,
     private jwtService: JwtService,
   ) {}
 
-  async register(registerDto: RegisterDto) {
+  async register(registerDto: RegisterDto, guestId?: string) {
     const existingUser = await this.userRepository.findOne({
       where: { username: registerDto.username },
     });
@@ -38,15 +39,20 @@ export class AuthService {
       throw new ConflictException('用户名已存在');
     }
 
-    // 加密密码
     const hashedPassword = await bcrypt.hash(registerDto.password, 10);
 
     const user = this.userRepository.create({
       username: registerDto.username,
       password: hashedPassword,
+      nickname: registerDto.username,
     });
 
     await this.userRepository.save(user);
+
+    // 如果有 guestId，迁移游客数据
+    if (guestId) {
+      await this.migrateGuestData(user.id, guestId);
+    }
 
     const payload = { username: user.username, sub: user.id };
     return {
@@ -54,6 +60,7 @@ export class AuthService {
       user: {
         id: user.id,
         username: user.username,
+        nickname: user.nickname,
       },
     };
   }
@@ -71,7 +78,42 @@ export class AuthService {
       user: {
         id: user.id,
         username: user.username,
+        nickname: user.nickname || user.username,
       },
+    };
+  }
+
+  async getUserInfo(userId: number) {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+
+    if (!user) {
+      throw new NotFoundException('用户不存在');
+    }
+
+    return {
+      id: user.id,
+      username: user.username,
+      nickname: user.nickname || user.username,
+    };
+  }
+
+  async updateProfile(userId: number, data: { nickname?: string }) {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+
+    if (!user) {
+      throw new NotFoundException('用户不存在');
+    }
+
+    if (data.nickname) {
+      user.nickname = data.nickname;
+    }
+
+    await this.userRepository.save(user);
+
+    return {
+      id: user.id,
+      username: user.username,
+      nickname: user.nickname,
     };
   }
 
@@ -79,14 +121,25 @@ export class AuthService {
     const user = await this.userRepository.findOne({ where: { username } });
 
     if (user && (await bcrypt.compare(password, user.password))) {
-      const { password, ...result } = user;
+      const { password: _, ...result } = user;
       return result;
     }
 
     return null;
   }
 
-  // 新增：游客数据迁移
+  // 迁移游客数据到注册用户
+  private async migrateGuestData(userId: number, guestId: string) {
+    // 更新游客创建的游戏的 userId
+    await this.gamePlayerRepository
+      .createQueryBuilder()
+      .update(GamePlayer)
+      .set({ userId })
+      .where('guestId = :guestId', { guestId })
+      .execute();
+  }
+
+  // 游客数据迁移（批量）
   async migrate(userId: number, migrateDto: MigrateDto) {
     const user = await this.userRepository.findOne({ where: { id: userId } });
 
@@ -98,14 +151,11 @@ export class AuthService {
 
     for (const guestGame of migrateDto.games) {
       try {
-        // 生成唯一房间码
         const roomCode = this.generateRoomCode();
 
-        // 创建游戏
         const game = this.gameRepository.create({
           roomCode,
           name: guestGame.name,
-          buyIn: guestGame.buyIn,
           userId: user.id,
           status: guestGame.status || 'completed',
           createdAt: guestGame.createdAt
@@ -115,34 +165,26 @@ export class AuthService {
 
         await this.gameRepository.save(game);
 
-        // 创建玩家映射表
         const playerIdMap = new Map<string, number>();
 
-        // 插入玩家数据
         for (const playerName of guestGame.players) {
           const player = this.gamePlayerRepository.create({
             name: playerName,
             gameId: game.id,
+            userId: user.id,
           });
           await this.gamePlayerRepository.save(player);
           playerIdMap.set(playerName, player.id);
         }
 
-        // 插入记录数据
-        for (const record of guestGame.records) {
-          const dbPlayerId = playerIdMap.get(record.playerId);
-
-          if (dbPlayerId) {
-            const newRecord = this.recordRepository.create({
-              gameId: game.id,
-              playerId: dbPlayerId,
-              amount: record.amount,
-              type: record.type,
-              createdAt: record.createdAt
-                ? new Date(record.createdAt)
-                : new Date(),
-            });
-            await this.recordRepository.save(newRecord);
+        // 迁移旧的 records 为 transactions（如果有的话）
+        if (guestGame.records) {
+          for (const record of guestGame.records) {
+            const dbPlayerId = playerIdMap.get(record.playerId);
+            // 旧数据格式不兼容新的转账模式，跳过
+            if (dbPlayerId) {
+              // 旧的 buy_in/cash_out 记录无法直接映射为转账，仅迁移游戏和玩家
+            }
           }
         }
 
@@ -165,7 +207,6 @@ export class AuthService {
     };
   }
 
-  // 生成6位房间码
   private generateRoomCode(): string {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let code = '';

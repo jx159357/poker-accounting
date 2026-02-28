@@ -10,10 +10,10 @@ import {
 } from 'typeorm';
 import { User } from './user.entity';
 import { GamePlayer } from './game-player.entity';
-import { Record } from './record.entity';
+import { Transaction } from './transaction.entity';
 
 @Entity()
-@Index(['userId', 'createdAt']) // 添加索引优化查询
+@Index(['userId', 'createdAt'])
 export class Game {
   @PrimaryGeneratedColumn()
   id: number;
@@ -24,8 +24,8 @@ export class Game {
   @Column()
   name: string;
 
-  @Column('decimal', { precision: 10, scale: 2 })
-  buyIn: number;
+  @Column({ default: '德州扑克' })
+  gameType: string;
 
   @Column({ default: 'active' })
   status: string;
@@ -39,8 +39,10 @@ export class Game {
   @OneToMany(() => GamePlayer, (player) => player.game, { cascade: true })
   players: GamePlayer[];
 
-  @OneToMany(() => Record, (record) => record.game, { cascade: true })
-  records: Record[];
+  @OneToMany(() => Transaction, (transaction) => transaction.game, {
+    cascade: true,
+  })
+  transactions: Transaction[];
 
   @CreateDateColumn()
   createdAt: Date;

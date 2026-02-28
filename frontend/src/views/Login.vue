@@ -2,15 +2,13 @@
   <div class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-8 animate-fade-in">
       <div class="text-center mb-8">
-        <h1 class="text-3xl font-bold text-gray-800 mb-2">德州扑克记账</h1>
+        <h1 class="text-3xl font-bold text-gray-800 mb-2">打牌记账</h1>
         <p class="text-gray-600">登录您的账户</p>
       </div>
 
       <form @submit.prevent="handleLogin" class="space-y-6">
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">
-            用户名
-          </label>
+          <label class="block text-sm font-medium text-gray-700 mb-2">用户名</label>
           <input
             v-model="username"
             type="text"
@@ -21,9 +19,7 @@
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">
-            密码
-          </label>
+          <label class="block text-sm font-medium text-gray-700 mb-2">密码</label>
           <input
             v-model="password"
             type="password"
@@ -38,7 +34,7 @@
           :disabled="userStore.loading"
           class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition font-medium disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center"
         >
-          <Loading v-if="userStore.loading" size="small" text="" />
+          <van-loading v-if="userStore.loading" size="20px" color="#fff" />
           <span v-else>登录</span>
         </button>
       </form>
@@ -64,37 +60,35 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
-import { useRouter } from 'vue-router';
-import { useUserStore } from '../stores/user';
-import { useToastStore } from '../stores/toast';
-import Loading from '../components/Loading.vue';
+import { ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { showToast } from 'vant'
+import { useUserStore } from '../stores/user'
 
-const router = useRouter();
-const userStore = useUserStore();
-const toastStore = useToastStore();
+const router = useRouter()
+const userStore = useUserStore()
 
-const username = ref('');
-const password = ref('');
+const username = ref('')
+const password = ref('')
 
 const handleLogin = async () => {
   if (!username.value.trim() || !password.value.trim()) {
-    toastStore.error('请输入用户名和密码');
-    return;
+    showToast('请输入用户名和密码')
+    return
   }
 
   try {
-    await userStore.login(username.value, password.value);
-    toastStore.success('登录成功！');
-    router.push('/home');
+    await userStore.login(username.value, password.value)
+    showToast('登录成功！')
+    router.push('/home')
   } catch (error) {
-    toastStore.error(error.message || '登录失败，请检查用户名和密码');
+    showToast(error.response?.data?.message || '登录失败')
   }
-};
+}
 
 const handleGuestLogin = () => {
-  userStore.setGuestMode();
-  toastStore.info('游客模式已启用');
-  router.push('/home');
-};
+  userStore.setGuestMode()
+  showToast('游客模式已启用')
+  router.push('/home')
+}
 </script>

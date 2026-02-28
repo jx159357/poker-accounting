@@ -4,6 +4,10 @@ import Login from '../views/Login.vue'
 import Register from '../views/Register.vue'
 import Room from '../views/Room.vue'
 import Profile from '../views/Profile.vue'
+import CreateGame from '../views/CreateGame.vue'
+import GameDetail from '../views/GameDetail.vue'
+import History from '../views/History.vue'
+import Statistics from '../views/Statistics.vue'
 
 const routes = [
   {
@@ -26,9 +30,29 @@ const routes = [
     component: Register
   },
   {
-    path: '/room/:id',
+    path: '/create',
+    name: 'CreateGame',
+    component: CreateGame
+  },
+  {
+    path: '/room/:roomCode',
     name: 'Room',
     component: Room
+  },
+  {
+    path: '/game/:id',
+    name: 'GameDetail',
+    component: GameDetail
+  },
+  {
+    path: '/history',
+    name: 'History',
+    component: History
+  },
+  {
+    path: '/statistics',
+    name: 'Statistics',
+    component: Statistics
   },
   {
     path: '/profile',

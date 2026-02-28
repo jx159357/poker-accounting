@@ -8,9 +8,7 @@
 
       <form @submit.prevent="handleRegister" class="space-y-6">
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">
-            用户名
-          </label>
+          <label class="block text-sm font-medium text-gray-700 mb-2">用户名</label>
           <input
             v-model="username"
             type="text"
@@ -21,9 +19,7 @@
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">
-            密码
-          </label>
+          <label class="block text-sm font-medium text-gray-700 mb-2">密码</label>
           <input
             v-model="password"
             type="password"
@@ -34,9 +30,7 @@
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">
-            确认密码
-          </label>
+          <label class="block text-sm font-medium text-gray-700 mb-2">确认密码</label>
           <input
             v-model="confirmPassword"
             type="password"
@@ -51,7 +45,7 @@
           :disabled="userStore.loading"
           class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition font-medium disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center"
         >
-          <Loading v-if="userStore.loading" size="small" text="" />
+          <van-loading v-if="userStore.loading" size="20px" color="#fff" />
           <span v-else>注册</span>
         </button>
       </form>
@@ -67,48 +61,45 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
-import { useRouter } from 'vue-router';
-import { useUserStore } from '../stores/user';
-import { useToastStore } from '../stores/toast';
-import Loading from '../components/Loading.vue';
+import { ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { showToast } from 'vant'
+import { useUserStore } from '../stores/user'
 
-const router = useRouter();
-const userStore = useUserStore();
-const toastStore = useToastStore();
+const router = useRouter()
+const userStore = useUserStore()
 
-const username = ref('');
-const password = ref('');
-const confirmPassword = ref('');
+const username = ref('')
+const password = ref('')
+const confirmPassword = ref('')
 
 const handleRegister = async () => {
-  // 表单验证
   if (!username.value.trim() || !password.value.trim() || !confirmPassword.value.trim()) {
-    toastStore.error('请填写所有字段');
-    return;
+    showToast('请填写所有字段')
+    return
   }
 
   if (username.value.length < 3) {
-    toastStore.error('用户名至少3个字符');
-    return;
+    showToast('用户名至少3个字符')
+    return
   }
 
   if (password.value.length < 6) {
-    toastStore.error('密码至少6个字符');
-    return;
+    showToast('密码至少6个字符')
+    return
   }
 
   if (password.value !== confirmPassword.value) {
-    toastStore.error('两次密码输入不一致');
-    return;
+    showToast('两次密码输入不一致')
+    return
   }
 
   try {
-    await userStore.register(username.value, password.value);
-    toastStore.success('注册成功！');
-    router.push('/home');
+    await userStore.register(username.value, password.value)
+    showToast('注册成功！')
+    router.push('/home')
   } catch (error) {
-    toastStore.error(error.message || '注册失败，用户名可能已存在');
+    showToast(error.response?.data?.message || '注册失败')
   }
-};
+}
 </script>

@@ -1,14 +1,19 @@
-import { IsString, IsNumber, IsArray, IsOptional } from 'class-validator';
+import { IsString, IsArray, IsOptional } from 'class-validator';
 
 export class CreateGameDto {
   @IsString()
   name: string;
 
-  @IsNumber()
-  buyIn: number;
+  @IsString()
+  @IsOptional()
+  gameType?: string;
 
   @IsArray()
   @IsString({ each: true })
   @IsOptional()
   players?: string[];
+
+  @IsString()
+  @IsOptional()
+  guestId?: string;
 }

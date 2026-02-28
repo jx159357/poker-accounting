@@ -1,6 +1,6 @@
 <template>
   <div class="profile-page">
-    <van-nav-bar title="个人资料" left-arrow @click="$router.back()" fixed />
+    <van-nav-bar title="个人资料" left-arrow @click-left="router.back()" fixed />
 
     <div class="profile-container">
       <!-- 头像区域 -->
@@ -22,12 +22,12 @@
           :readonly="!isEditing"
         />
         <van-field
-          v-if="!userStore.isGuest && userStore.userInfo"
+          v-if="userStore.isLoggedIn && userStore.userInfo"
           :model-value="userStore.userInfo.username"
           label="账号"
           readonly
         />
-        <van-field :model-value="userId" label="ID" readonly />
+        <van-field :model-value="displayId" label="ID" readonly />
       </van-cell-group>
 
       <!-- 操作按钮 -->
@@ -36,16 +36,16 @@
           修改昵称
         </van-button>
         <template v-else>
-          <van-button type="primary" size="large" block @click="saveNickname"> 保存 </van-button>
-          <van-button size="large" block @click="cancelEdit"> 取消 </van-button>
+          <van-button type="primary" size="large" block @click="saveNickname">保存</van-button>
+          <van-button size="large" block @click="cancelEdit">取消</van-button>
         </template>
 
         <van-button v-if="userStore.isGuest" type="success" size="large" block @click="goRegister">
-          注册账号（保留数据）
+          注册账号
         </van-button>
 
         <van-button
-          v-if="!userStore.isGuest"
+          v-if="userStore.isLoggedIn"
           type="warning"
           size="large"
           block
@@ -72,9 +72,10 @@ const nickname = ref(userStore.currentNickname)
 const isEditing = ref(false)
 const originalNickname = ref('')
 
-const userId = computed(() => {
-  const id = userStore.isLoggedIn ? userStore.currentUserId : userStore.currentGuestId
-  return id?.length > 8 ? id.substring(0, 8) + '...' : id
+const displayId = computed(() => {
+  const id = userStore.currentUserId
+  if (!id) return '-'
+  return id.length > 8 ? id.substring(0, 8) + '...' : id
 })
 
 const avatarText = computed(() => {
@@ -82,7 +83,7 @@ const avatarText = computed(() => {
 })
 
 const avatarStyle = computed(() => {
-  const color = getAvatarColorByString(userStore.currentUserId)
+  const color = getAvatarColorByString(userStore.currentUserId || 'guest')
   return {
     background: color.bg,
     color: color.text
@@ -112,7 +113,7 @@ const saveNickname = async () => {
     closeToast()
     showToast('保存成功')
     isEditing.value = false
-  } catch (error) {
+  } catch {
     closeToast()
     showToast('保存失败')
   }
@@ -136,14 +137,13 @@ const confirmLogout = async () => {
   }
 }
 
-// 组件挂载时确保用户信息已加载
 onMounted(async () => {
-  if (!userStore.isGuest && !userStore.userInfo) {
+  if (userStore.isLoggedIn && !userStore.userInfo) {
     try {
       await userStore.getUserInfo()
       nickname.value = userStore.currentNickname
-    } catch (error) {
-      console.error('加载用户信息失败:', error)
+    } catch {
+      // 静默
     }
   }
 })
@@ -157,7 +157,7 @@ onMounted(async () => {
 
 .profile-container {
   padding-top: 46px;
-  padding-bottom: 20px;
+  padding-bottom: 80px;
 }
 
 .avatar-section {

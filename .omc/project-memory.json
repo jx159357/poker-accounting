@@ -1,0 +1,395 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1772249729105,
+  "projectRoot": "D:\\demo_jx\\github\\poker-accounting",
+  "techStack": {
+    "languages": [
+      {
+        "name": "JavaScript/TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "package.json"
+        ]
+      }
+    ],
+    "frameworks": [],
+    "packageManager": "npm",
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": null,
+    "testCommand": null,
+    "lintCommand": null,
+    "devCommand": null,
+    "scripts": {}
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [],
+    "gitBranches": {
+      "defaultBranch": "master",
+      "branchingStrategy": null
+    }
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "backend": {
+      "path": "backend",
+      "purpose": null,
+      "fileCount": 10,
+      "lastAccessed": 1772249729087,
+      "keyFiles": [
+        "eslint.config.mjs",
+        "nest-cli.json",
+        "package-lock.json",
+        "package.json",
+        "poker.db"
+      ]
+    },
+    "frontend": {
+      "path": "frontend",
+      "purpose": null,
+      "fileCount": 6,
+      "lastAccessed": 1772249729087,
+      "keyFiles": [
+        "index.html",
+        "package-lock.json",
+        "package.json",
+        "README.md",
+        "vite.config.js"
+      ]
+    },
+    "backend\\dist": {
+      "path": "backend\\dist",
+      "purpose": "Distribution/build output",
+      "fileCount": 13,
+      "lastAccessed": 1772249729093,
+      "keyFiles": [
+        "app.controller.d.ts",
+        "app.controller.js",
+        "app.controller.js.map"
+      ]
+    },
+    "backend\\node_modules": {
+      "path": "backend\\node_modules",
+      "purpose": "Dependencies",
+      "fileCount": 1,
+      "lastAccessed": 1772249729095,
+      "keyFiles": []
+    },
+    "frontend\\node_modules": {
+      "path": "frontend\\node_modules",
+      "purpose": "Dependencies",
+      "fileCount": 1,
+      "lastAccessed": 1772249729096,
+      "keyFiles": []
+    },
+    "frontend\\public": {
+      "path": "frontend\\public",
+      "purpose": "Public files",
+      "fileCount": 1,
+      "lastAccessed": 1772249729096,
+      "keyFiles": [
+        "vite.svg"
+      ]
+    },
+    "frontend\\src": {
+      "path": "frontend\\src",
+      "purpose": "Source code",
+      "fileCount": 3,
+      "lastAccessed": 1772249729096,
+      "keyFiles": [
+        "App.vue",
+        "main.js",
+        "style.css"
+      ]
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "",
+      "accessCount": 6,
+      "lastAccessed": 1772249870621,
+      "type": "directory"
+    },
+    {
+      "path": "backend\\src\\entities\\game-player.entity.ts",
+      "accessCount": 6,
+      "lastAccessed": 1772264131051,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\game\\dto\\create-game.dto.ts",
+      "accessCount": 5,
+      "lastAccessed": 1772264203136,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\app.module.ts",
+      "accessCount": 5,
+      "lastAccessed": 1772264203675,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\game\\game.service.ts",
+      "accessCount": 5,
+      "lastAccessed": 1772264270588,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\game\\game.controller.ts",
+      "accessCount": 5,
+      "lastAccessed": 1772264270992,
+      "type": "file"
+    },
+    {
+      "path": "frontend\\src\\api\\game.js",
+      "accessCount": 5,
+      "lastAccessed": 1772264453748,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\entities\\user.entity.ts",
+      "accessCount": 4,
+      "lastAccessed": 1772263642789,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\entities\\game.entity.ts",
+      "accessCount": 4,
+      "lastAccessed": 1772264130729,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\game\\game.module.ts",
+      "accessCount": 4,
+      "lastAccessed": 1772264203946,
+      "type": "file"
+    },
+    {
+      "path": "frontend\\src\\stores\\game.js",
+      "accessCount": 4,
+      "lastAccessed": 1772264454038,
+      "type": "file"
+    },
+    {
+      "path": "frontend\\src\\views\\Room.vue",
+      "accessCount": 4,
+      "lastAccessed": 1772264454357,
+      "type": "file"
+    },
+    {
+      "path": "frontend\\src\\views\\CreateGame.vue",
+      "accessCount": 4,
+      "lastAccessed": 1772264454848,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\game\\dto\\create-record.dto.ts",
+      "accessCount": 3,
+      "lastAccessed": 1772263272044,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\entities\\game-record.entity.ts",
+      "accessCount": 3,
+      "lastAccessed": 1772263672669,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\entities\\record.entity.ts",
+      "accessCount": 3,
+      "lastAccessed": 1772263672694,
+      "type": "file"
+    },
+    {
+      "path": "frontend\\src\\views\\Statistics.vue",
+      "accessCount": 3,
+      "lastAccessed": 1772264455481,
+      "type": "file"
+    },
+    {
+      "path": "frontend\\src\\api\\auth.js",
+      "accessCount": 2,
+      "lastAccessed": 1772263107577,
+      "type": "file"
+    },
+    {
+      "path": "frontend\\src\\stores\\user.js",
+      "accessCount": 2,
+      "lastAccessed": 1772263107726,
+      "type": "file"
+    },
+    {
+      "path": "frontend\\src\\stores\\toast.js",
+      "accessCount": 2,
+      "lastAccessed": 1772263107871,
+      "type": "file"
+    },
+    {
+      "path": "frontend\\src\\utils\\request.js",
+      "accessCount": 2,
+      "lastAccessed": 1772263107888,
+      "type": "file"
+    },
+    {
+      "path": "frontend\\src\\utils\\nameGenerator.js",
+      "accessCount": 2,
+      "lastAccessed": 1772263107932,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\main.ts",
+      "accessCount": 2,
+      "lastAccessed": 1772263116248,
+      "type": "file"
+    },
+    {
+      "path": "backend\\package.json",
+      "accessCount": 2,
+      "lastAccessed": 1772263116275,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\auth\\auth.controller.ts",
+      "accessCount": 2,
+      "lastAccessed": 1772263135119,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\auth\\auth.service.ts",
+      "accessCount": 2,
+      "lastAccessed": 1772263135199,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\auth\\jwt-auth.guard.ts",
+      "accessCount": 2,
+      "lastAccessed": 1772263155674,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\auth\\jwt.strategy.ts",
+      "accessCount": 2,
+      "lastAccessed": 1772263155702,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\auth\\dto\\register.dto.ts",
+      "accessCount": 2,
+      "lastAccessed": 1772263180143,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\auth\\dto\\login.dto.ts",
+      "accessCount": 2,
+      "lastAccessed": 1772263180161,
+      "type": "file"
+    },
+    {
+      "path": "frontend\\src\\views\\History.vue",
+      "accessCount": 2,
+      "lastAccessed": 1772264455170,
+      "type": "file"
+    },
+    {
+      "path": "frontend\\src\\style.css",
+      "accessCount": 1,
+      "lastAccessed": 1772249835921,
+      "type": "file"
+    },
+    {
+      "path": "frontend\\src\\App.vue",
+      "accessCount": 1,
+      "lastAccessed": 1772249836153,
+      "type": "file"
+    },
+    {
+      "path": "frontend\\src\\main.js",
+      "accessCount": 1,
+      "lastAccessed": 1772249836170,
+      "type": "file"
+    },
+    {
+      "path": "frontend\\src\\views\\Home.vue",
+      "accessCount": 1,
+      "lastAccessed": 1772249836444,
+      "type": "file"
+    },
+    {
+      "path": "frontend\\src\\views\\Login.vue",
+      "accessCount": 1,
+      "lastAccessed": 1772249836463,
+      "type": "file"
+    },
+    {
+      "path": "frontend\\src\\views\\Profile.vue",
+      "accessCount": 1,
+      "lastAccessed": 1772249836486,
+      "type": "file"
+    },
+    {
+      "path": "frontend\\src\\stores\\guest.js",
+      "accessCount": 1,
+      "lastAccessed": 1772249905697,
+      "type": "file"
+    },
+    {
+      "path": "frontend\\src\\views\\GameDetail.vue",
+      "accessCount": 1,
+      "lastAccessed": 1772249905785,
+      "type": "file"
+    },
+    {
+      "path": "frontend\\src\\views\\Register.vue",
+      "accessCount": 1,
+      "lastAccessed": 1772249905851,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\auth\\auth.module.ts",
+      "accessCount": 1,
+      "lastAccessed": 1772263135135,
+      "type": "file"
+    },
+    {
+      "path": "backend\\.env",
+      "accessCount": 1,
+      "lastAccessed": 1772263135223,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\auth\\dto\\migrate.dto.ts",
+      "accessCount": 1,
+      "lastAccessed": 1772263180111,
+      "type": "file"
+    },
+    {
+      "path": "C:\\Users\\Administrator\\.claude\\plans\\sorted-juggling-mist.md",
+      "accessCount": 1,
+      "lastAccessed": 1772263517755,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\entities\\transaction.entity.ts",
+      "accessCount": 1,
+      "lastAccessed": 1772264130414,
+      "type": "file"
+    },
+    {
+      "path": "backend\\src\\game\\dto\\create-transaction.dto.ts",
+      "accessCount": 1,
+      "lastAccessed": 1772264203404,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}
