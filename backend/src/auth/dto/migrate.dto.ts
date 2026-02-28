@@ -33,13 +33,15 @@ class GuestGameDto {
   @IsString({ each: true })
   players: string[];
 
+  @IsOptional()
   @IsNumber()
-  buyIn: number;
+  buyIn?: number;
 
+  @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => GuestRecordDto)
-  records: GuestRecordDto[];
+  records?: GuestRecordDto[];
 
   @IsOptional()
   @IsString()

@@ -5,7 +5,6 @@ import Register from '../views/Register.vue'
 import Room from '../views/Room.vue'
 import Profile from '../views/Profile.vue'
 import CreateGame from '../views/CreateGame.vue'
-import GameDetail from '../views/GameDetail.vue'
 import History from '../views/History.vue'
 import Statistics from '../views/Statistics.vue'
 
@@ -39,12 +38,7 @@ const routes = [
     name: 'Room',
     component: Room
   },
-  {
-    path: '/game/:id',
-    name: 'GameDetail',
-    component: GameDetail
-  },
-  {
+{
     path: '/history',
     name: 'History',
     component: History
