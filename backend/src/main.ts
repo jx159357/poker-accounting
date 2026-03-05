@@ -7,7 +7,10 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
 
-  app.enableCors();
+  app.enableCors({
+    origin: true, // 或者 '*'
+    credentials: true,
+  });
 
   app.useGlobalPipes(
     new ValidationPipe({

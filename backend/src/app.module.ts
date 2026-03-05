@@ -1,51 +1,33 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { ConfigModule } from '@nestjs/config';
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
-import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AuthModule } from './auth/auth.module';
+import { UserModule } from './user/user.module';
 import { GameModule } from './game/game.module';
-import { User } from './entities/user.entity';
-import { Game } from './entities/game.entity';
-import { GamePlayer } from './entities/game-player.entity';
-import { GameRecord } from './entities/game-record.entity';
-import { Transaction } from './entities/transaction.entity';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({
-      isGlobal: true,
-      envFilePath: '.env',
-    }),
-    ThrottlerModule.forRoot([
-      {
-        ttl: 60000,
-        limit: 10,
-      },
-    ]),
+    // 启用定时任务
+    ScheduleModule.forRoot(),
+
+    // 配置限流 - 放宽限制
+    ThrottlerModule.forRoot([{
+      ttl: 60000, // 60秒
+      limit: 99999, // 100次请求
+    }]),
+
+    // 数据库配置
     TypeOrmModule.forRoot({
       type: 'sqlite',
-      database: 'poker.db',
-      entities: [User, Game, GamePlayer, GameRecord, Transaction],
+      database: 'poker-accounting.db',
+      entities: [__dirname + '/**/*.entity{.ts,.js}'],
       synchronize: true,
-      logging: false,
-      extra: {
-        pragma: [
-          'journal_mode = WAL',
-          'synchronous = NORMAL',
-          'cache_size = -64000',
-          'temp_store = MEMORY',
-        ],
-      },
     }),
+
     AuthModule,
+    UserModule,
     GameModule,
-  ],
-  providers: [
-    {
-      provide: APP_GUARD,
-      useClass: ThrottlerGuard,
-    },
   ],
 })
 export class AppModule {}
