@@ -58,3 +58,12 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 .env
 .env.local
 .env.*.local
+
+# 数据库文件
+*.db
+*.sqlite
+*.sqlite3
+
+# 开发环境数据
+backend/poker.db
+
