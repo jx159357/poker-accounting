@@ -2,118 +2,119 @@ import {
   Controller,
   Get,
   Post,
+  Delete,
+  Patch,
   Body,
   Param,
   Query,
-  UseGuards,
   Request,
-  Delete,
   Headers,
+  BadRequestException,
 } from '@nestjs/common';
 import { GameService } from './game.service';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { CreateGameDto } from './dto/create-game.dto';
 
 @Controller('game')
 export class GameController {
   constructor(private readonly gameService: GameService) {}
 
-  // 创建游戏房间
   @Post('create')
-  @UseGuards(JwtAuthGuard)
-  async createGame(
-    @Body() dto: CreateGameDto,
-    @Request() req: any,
-    @Headers('x-guest-id') guestId: string,
-  ) {
-    const userId = req.user?.userId;
-    dto.guestId = dto.guestId || guestId;
-    return await this.gameService.createGame(dto, userId);
-  }
-
-  // 加入游戏房间
-  @Post('join/:roomCode')
-  @UseGuards(JwtAuthGuard)
-  async joinGame(
-    @Param('roomCode') roomCode: string,
-    @Body() body: any,
-    @Request() req: any,
-    @Headers('x-guest-id') guestId: string,
-  ) {
-    const userId = req.user?.userId;
-    const nickname = body.nickname || body.name;
-    return await this.gameService.joinGame(
-      roomCode,
-      nickname,
-      userId,
-      guestId,
+  async createGame(@Body() body: any) {
+    return this.gameService.createGame(
+      body.name,
+      body.gameType || '其他',
+      body.creatorId,
+      body.creatorType,
+      body.nickname,
     );
   }
 
-  // 获取我的游戏列表
-  @Get('my-games')
-  @UseGuards(JwtAuthGuard)
+  @Post('join/:roomCode')
+  async joinGame(@Param('roomCode') roomCode: string, @Body() body: any) {
+    return this.gameService.joinGame(
+      roomCode,
+      body.nickname,
+      body.playerId,
+      body.playerType,
+    );
+  }
+
+  @Get(':roomCode')
+  async getGameDetail(@Param('roomCode') roomCode: string) {
+    return this.gameService.getGameDetail(roomCode);
+  }
+
+  @Get('my-games/list')
   async getMyGames(
-    @Query('guestId') queryGuestId: string,
-    @Request() req: any,
-    @Headers('x-guest-id') headerGuestId: string,
+    @Query('playerId') playerId: string,
+    @Query('playerType') playerType: string,
   ) {
-    const userId = req.user?.userId;
-    const guestId = queryGuestId || headerGuestId;
-    return await this.gameService.getMyGames(userId, guestId);
+    return this.gameService.getMyGames(playerId, playerType);
   }
 
-  // 获取房间详情
-  @Get('room/:roomCode')
-  async getRoomDetail(@Param('roomCode') roomCode: string) {
-    return await this.gameService.getRoomDetail(roomCode);
-  }
-
-  // 添加转账
-  @Post('room/:roomCode/transaction')
-  async addTransaction(
-    @Param('roomCode') roomCode: string,
-    @Body() body: any,
-  ) {
-    return await this.gameService.addTransaction(
+  @Post(':roomCode/score')
+  async addScore(@Param('roomCode') roomCode: string, @Body() body: any) {
+    return this.gameService.addScore(
       roomCode,
       body.fromPlayerId,
       body.toPlayerId,
-      Number(body.amount),
-      body.remark,
+      body.score,
+      body.note,
     );
   }
 
-  // 撤销转账
-  @Delete('room/:roomCode/transaction/:transactionId')
-  async undoTransaction(
+  @Delete(':roomCode/score/:recordId')
+  async undoScore(
     @Param('roomCode') roomCode: string,
-    @Param('transactionId') transactionId: string,
+    @Param('recordId') recordId: string,
+    @Headers('x-guest-id') guestId: string,
+    @Request() req,
   ) {
-    return await this.gameService.undoTransaction(
+    // 获取请求者ID
+    let requesterId: string;
+
+    if (req.user) {
+      // 注册用户
+      requesterId = `user_${req.user.username}`;
+    } else if (guestId) {
+      // 游客
+      requesterId = guestId;
+    } else {
+      throw new BadRequestException('未授权');
+    }
+
+    await this.gameService.undoScore(roomCode, parseInt(recordId), requesterId);
+
+    return { message: '撤销成功' };
+  }
+
+  @Patch(':roomCode/player/:playerId/nickname')
+  async updatePlayerNickname(
+    @Param('roomCode') roomCode: string,
+    @Param('playerId') playerId: number,
+    @Body() body: any,
+  ) {
+    return this.gameService.updatePlayerNickname(
       roomCode,
-      parseInt(transactionId),
+      playerId,
+      body.nickname,
     );
   }
 
-  // 结算房间
-  @Post('room/:roomCode/settle')
-  @UseGuards(JwtAuthGuard)
-  async settleRoom(@Param('roomCode') roomCode: string) {
-    return await this.gameService.settleRoom(roomCode);
+  @Post(':roomCode/end')
+  async endGame(@Param('roomCode') roomCode: string) {
+    return this.gameService.endGame(roomCode);
   }
 
-  // 结束房间
-  @Post('room/:roomCode/finish')
-  async finishRoom(@Param('roomCode') roomCode: string) {
-    return await this.gameService.finishRoom(roomCode);
+  @Delete(':roomCode')
+  async deleteGame(@Param('roomCode') roomCode: string, @Body() body: any) {
+    return this.gameService.deleteGame(roomCode, body.requesterId);
   }
 
-  // 获取统计数据
-  @Get('statistics')
-  @UseGuards(JwtAuthGuard)
-  async getStatistics(@Request() req: any) {
-    const userId = req.user.userId;
-    return await this.gameService.getStatistics(userId);
+  @Get('stats/data')
+  async getStats(
+    @Query('playerId') playerId: string,
+    @Query('playerType') playerType: string,
+  ) {
+    return this.gameService.getStats(playerId, playerType);
   }
 }

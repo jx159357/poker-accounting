@@ -5,11 +5,10 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { Game } from '../entities/game.entity';
 import { GamePlayer } from '../entities/game-player.entity';
-import { Transaction } from '../entities/transaction.entity';
 import { GameRecord } from '../entities/game-record.entity';
-import { CreateGameDto } from './dto/create-game.dto';
 
 @Injectable()
 export class GameService {
@@ -17,62 +16,91 @@ export class GameService {
     @InjectRepository(Game)
     private gameRepository: Repository<Game>,
     @InjectRepository(GamePlayer)
-    private gamePlayerRepository: Repository<GamePlayer>,
-    @InjectRepository(Transaction)
-    private transactionRepository: Repository<Transaction>,
+    private playerRepository: Repository<GamePlayer>,
     @InjectRepository(GameRecord)
-    private gameRecordRepository: Repository<GameRecord>,
+    private recordRepository: Repository<GameRecord>,
   ) {}
 
-  // 创建游戏房间
-  async createGame(dto: CreateGameDto, userId?: number) {
-    const roomCode = this.generateRoomCode();
-
-    const game = this.gameRepository.create({
-      roomCode,
-      name: dto.name,
-      gameType: dto.gameType || '德州扑克',
-      userId: userId || null,
-      status: 'active',
-    });
-
-    await this.gameRepository.save(game);
-
-    // 创建玩家
-    if (dto.players && dto.players.length > 0) {
-      for (const playerName of dto.players) {
-        const player = this.gamePlayerRepository.create({
-          name: playerName,
-          gameId: game.id,
-          userId: userId || null,
-          guestId: dto.guestId || null,
-        });
-        await this.gamePlayerRepository.save(player);
-      }
-    }
-
-    // 如果是游客创建，保存游客ID关联
-    if (dto.guestId) {
-      const gameRecord = this.gameRecordRepository.create({
-        gameId: game.id,
-        guestId: dto.guestId,
-      });
-      await this.gameRecordRepository.save(gameRecord);
-    }
-
-    return this.getRoomDetail(roomCode);
+  // 生成房间号
+  private generateRoomCode(): string {
+    return Math.random().toString(36).substring(2, 8).toUpperCase();
   }
 
-  // 加入游戏房间
+  // 获取玩家唯一标识
+  private getPlayerIdentifier(player: {
+    userId?: number;
+    guestId?: string;
+  }): string {
+    return player.userId ? `user_${player.userId}` : `guest_${player.guestId}`;
+  }
+
+  // 创建游戏
+  async createGame(
+    name: string,
+    gameType: string,
+    creatorId: string,
+    creatorType: string,
+    nickname: string,
+  ): Promise<Game> {
+    const roomCode = this.generateRoomCode();
+
+    // 创建游戏对象
+    const game = new Game();
+    game.name = name;
+    game.gameType = gameType;
+    game.roomCode = roomCode;
+    game.status = 'active';
+
+    // 根据创建者类型设置字段
+    if (creatorType === 'user') {
+      game.userId = parseInt(creatorId.replace('user_', ''));
+    } else {
+      game.guestId = creatorId;
+    }
+
+    const savedGame = await this.gameRepository.save(game);
+
+    // 创建者自动加入
+    const player = new GamePlayer();
+    player.game = savedGame;
+    player.name = nickname;
+    player.balance = 0;
+
+    if (creatorType === 'user') {
+      player.userId = parseInt(creatorId.replace('user_', ''));
+    } else {
+      player.guestId = creatorId;
+    }
+
+    await this.playerRepository.save(player);
+
+    // 重新查询完整数据
+    return await this.gameRepository.findOne({
+      where: { id: savedGame.id },
+      relations: [
+        'players',
+        'gameRecords',
+        'gameRecords.fromPlayer',
+        'gameRecords.toPlayer',
+      ],
+    });
+  }
+
+  // 加入游戏
   async joinGame(
     roomCode: string,
-    playerName: string,
-    userId?: number,
-    guestId?: string,
-  ) {
+    nickname: string,
+    playerId: string,
+    playerType: string,
+  ): Promise<Game> {
     const game = await this.gameRepository.findOne({
       where: { roomCode },
-      relations: ['players'],
+      relations: [
+        'players',
+        'gameRecords',
+        'gameRecords.fromPlayer',
+        'gameRecords.toPlayer',
+      ],
     });
 
     if (!game) {
@@ -80,68 +108,59 @@ export class GameService {
     }
 
     if (game.status !== 'active') {
-      throw new BadRequestException('房间已结束');
+      throw new BadRequestException('游戏已结束');
     }
 
-    // 检查玩家是否已存在
-    const existingPlayer = game.players.find((p) => p.name === playerName);
-    if (existingPlayer) {
-      throw new BadRequestException('玩家已存在');
-    }
-
-    const player = this.gamePlayerRepository.create({
-      name: playerName,
-      gameId: game.id,
-      userId: userId || null,
-      guestId: guestId || null,
+    // 检查是否已加入
+    const existingPlayer = game.players.find((p) => {
+      const identifier = this.getPlayerIdentifier(p);
+      return identifier === playerId;
     });
 
-    await this.gamePlayerRepository.save(player);
-
-    return this.getRoomDetail(roomCode);
-  }
-
-  // 获取我的游戏列表
-  async getMyGames(userId?: number, guestId?: string) {
-    if (userId) {
-      return this.gameRepository.find({
-        where: { userId },
-        relations: [
-          'players',
-          'transactions',
-          'transactions.fromPlayer',
-          'transactions.toPlayer',
-        ],
-        order: { createdAt: 'DESC' },
-      });
-    } else if (guestId) {
-      const gameRecords = await this.gameRecordRepository.find({
-        where: { guestId: guestId },
-        relations: [
-          'game',
-          'game.players',
-          'game.transactions',
-          'game.transactions.fromPlayer',
-          'game.transactions.toPlayer',
-        ],
-      });
-
-      return gameRecords.map((gr) => gr.game);
+    if (existingPlayer) {
+      return game;
     }
 
-    return [];
+    // 创建新玩家
+    const player = new GamePlayer();
+    player.game = game;
+    player.name = nickname;
+    player.balance = 0;
+
+    if (playerType === 'user') {
+      player.userId = parseInt(playerId.replace('user_', ''));
+    } else {
+      player.guestId = playerId;
+    }
+
+    await this.playerRepository.save(player);
+
+    return await this.gameRepository.findOne({
+      where: { id: game.id },
+      relations: [
+        'players',
+        'gameRecords',
+        'gameRecords.fromPlayer',
+        'gameRecords.toPlayer',
+      ],
+    });
   }
 
-  // 获取房间详情
-  async getRoomDetail(roomCode: string) {
+  // 获取游戏详情
+  async getGameDetail(roomCode: string): Promise<Game> {
     const game = await this.gameRepository.findOne({
       where: { roomCode },
       relations: [
         'players',
-        'transactions',
-        'transactions.fromPlayer',
-        'transactions.toPlayer',
+        'gameRecords',
+        'gameRecords.fromPlayer',
+        'gameRecords.toPlayer',
       ],
+      order: {
+        gameRecords: {
+          createdAt: 'DESC',
+        },
+      },
     });
 
     if (!game) {
@@ -151,116 +170,73 @@ export class GameService {
     return game;
   }
 
-  // 添加转账
-  async addTransaction(
+  // 获取我的游戏列表
+  async getMyGames(playerId: string, playerType: string): Promise<any[]> {
+    // 验证参数
+    if (!playerId || !playerType) {
+      return [];
+    }
+
+    let players: GamePlayer[];
+
+    try {
+      if (playerType === 'user') {
+        // 提取用户ID
+        const userIdStr = playerId.replace('user_', '');
+        const userId = parseInt(userIdStr, 10);
+
+        // 验证是否为有效数字
+        if (isNaN(userId)) {
+          console.error('Invalid userId:', playerId);
+          return [];
+        }
+
+        players = await this.playerRepository.find({
+          where: { userId },
+          relations: ['game', 'game.players'],
+          order: {
+            game: {
+              createdAt: 'DESC',
+            },
+          },
+        });
+      } else {
+        // 游客模式
+        players = await this.playerRepository.find({
+          where: { guestId: playerId },
+          relations: ['game', 'game.players'],
+          order: {
+            game: {
+              createdAt: 'DESC',
+            },
+          },
+        });
+      }
+
+      return players.map((player) => ({
+        id: player.game.id,
+        name: player.game.name,
+        roomCode: player.game.roomCode,
+        gameType: player.game.gameType,
+        status: player.game.status,
+        playerCount: player.game.players.length,
+        myScore: player.balance,
+        createdAt: player.game.createdAt,
+      }));
+    } catch (error) {
+      console.error('Error in getMyGames:', error);
+      return [];
+    }
+  }
+
+  // 添加积分记录
+  async addScore(
     roomCode: string,
     fromPlayerId: number,
     toPlayerId: number,
-    amount: number,
-    remark?: string,
-  ) {
-    if (fromPlayerId === toPlayerId) {
-      throw new BadRequestException('付款方和收款方不能相同');
-    }
-
-    if (amount <= 0) {
-      throw new BadRequestException('金额必须大于0');
-    }
-
-    const game = await this.gameRepository.findOne({
-      where: { roomCode },
-    });
-
-    if (!game) {
-      throw new NotFoundException('房间不存在');
-    }
-
-    if (game.status !== 'active') {
-      throw new BadRequestException('房间已结束');
-    }
-
-    const fromPlayer = await this.gamePlayerRepository.findOne({
-      where: { id: fromPlayerId, gameId: game.id },
-    });
-
-    if (!fromPlayer) {
-      throw new NotFoundException('付款玩家不存在');
-    }
-
-    const toPlayer = await this.gamePlayerRepository.findOne({
-      where: { id: toPlayerId, gameId: game.id },
-    });
-
-    if (!toPlayer) {
-      throw new NotFoundException('收款玩家不存在');
-    }
-
-    // 创建转账记录
-    const transaction = this.transactionRepository.create({
-      gameId: game.id,
-      fromPlayerId,
-      toPlayerId,
-      amount,
-      remark: remark || '',
-    });
-
-    await this.transactionRepository.save(transaction);
-
-    // 更新双方 currentScore
-    fromPlayer.currentScore = Number(fromPlayer.currentScore) - amount;
-    toPlayer.currentScore = Number(toPlayer.currentScore) + amount;
-    await this.gamePlayerRepository.save(fromPlayer);
-    await this.gamePlayerRepository.save(toPlayer);
-
-    return this.getRoomDetail(roomCode);
-  }
-
-  // 撤销转账
-  async undoTransaction(roomCode: string, transactionId: number) {
-    const game = await this.gameRepository.findOne({
-      where: { roomCode },
-    });
-
-    if (!game) {
-      throw new NotFoundException('房间不存在');
-    }
-
-    const transaction = await this.transactionRepository.findOne({
-      where: { id: transactionId, gameId: game.id },
-    });
-
-    if (!transaction) {
-      throw new NotFoundException('转账记录不存在');
-    }
-
-    // 反向更新双方 currentScore
-    const fromPlayer = await this.gamePlayerRepository.findOne({
-      where: { id: transaction.fromPlayerId },
-    });
-
-    const toPlayer = await this.gamePlayerRepository.findOne({
-      where: { id: transaction.toPlayerId },
-    });
-
-    if (fromPlayer) {
-      fromPlayer.currentScore =
-        Number(fromPlayer.currentScore) + Number(transaction.amount);
-      await this.gamePlayerRepository.save(fromPlayer);
-    }
-
-    if (toPlayer) {
-      toPlayer.currentScore =
-        Number(toPlayer.currentScore) - Number(transaction.amount);
-      await this.gamePlayerRepository.save(toPlayer);
-    }
-
-    await this.transactionRepository.remove(transaction);
-
-    return this.getRoomDetail(roomCode);
-  }
-
-  // 结算房间
-  async settleRoom(roomCode: string) {
+    score: number,
+    note?: string,
+  ): Promise<GameRecord> {
     const game = await this.gameRepository.findOne({
       where: { roomCode },
       relations: ['players'],
@@ -270,22 +246,152 @@ export class GameService {
       throw new NotFoundException('房间不存在');
     }
 
-    const playerStats = game.players
-      .map((player) => ({
-        playerId: player.id,
-        playerName: player.name,
-        netChange: Number(player.currentScore),
-      }))
-      .sort((a, b) => b.netChange - a.netChange);
+    if (game.status !== 'active') {
+      throw new BadRequestException('游戏已结束');
+    }
+
+    const fromPlayer = await this.playerRepository.findOne({
+      where: { id: fromPlayerId },
+    });
+
+    const toPlayer = await this.playerRepository.findOne({
+      where: { id: toPlayerId },
+    });
+
+    if (!fromPlayer || !toPlayer) {
+      throw new NotFoundException('玩家不存在');
+    }
+
+    if (fromPlayerId === toPlayerId) {
+      throw new BadRequestException('不能给自己转分');
+    }
+
+    // 创建记录
+    const record = new GameRecord();
+    record.game = game;
+    record.fromPlayer = fromPlayer;
+    record.toPlayer = toPlayer;
+    record.amount = score;
+    record.note = note;
+
+    await this.recordRepository.save(record);
+
+    // 更新玩家余额
+    fromPlayer.balance = Number(fromPlayer.balance) - Number(score);
+    toPlayer.balance = Number(toPlayer.balance) + Number(score);
+
+    await this.playerRepository.save([fromPlayer, toPlayer]);
+
+    return await this.recordRepository.findOne({
+      where: { id: record.id },
+      relations: ['fromPlayer', 'toPlayer'],
+    });
+  }
+
+  // 撤销积分记录
+  async undoScore(
+    roomCode: string,
+    recordId: number,
+    requesterId: string,
+  ): Promise<void> {
+    const game = await this.gameRepository.findOne({
+      where: { roomCode },
+      relations: ['players'],
+    });
+
+    if (!game) {
+      throw new NotFoundException('房间不存在');
+    }
+
+    if (game.status !== 'active') {
+      throw new BadRequestException('游戏已结束');
+    }
+
+    const record = await this.recordRepository.findOne({
+      where: { id: recordId },
+      relations: ['fromPlayer', 'toPlayer'],
+    });
+
+    if (!record) {
+      throw new NotFoundException('记录不存在');
+    }
+
+    // 只有给分者可以撤销
+    const fromPlayerIdentifier = this.getPlayerIdentifier(record.fromPlayer);
+    if (fromPlayerIdentifier !== requesterId) {
+      throw new BadRequestException('只有给分者可以撤销记录');
+    }
+
+    // 恢复玩家余额
+    record.fromPlayer.balance =
+      Number(record.fromPlayer.balance) + Number(record.amount);
+    record.toPlayer.balance =
+      Number(record.toPlayer.balance) - Number(record.amount);
+
+    await this.playerRepository.save([record.fromPlayer, record.toPlayer]);
+
+    // 删除记录
+    await this.recordRepository.remove(record);
+  }
+
+  // 更新玩家昵称
+  async updatePlayerNickname(
+    roomCode: string,
+    playerId: number,
+    newNickname: string,
+  ): Promise<GamePlayer> {
+    const game = await this.gameRepository.findOne({
+      where: { roomCode },
+      relations: ['players'],
+    });
+
+    if (!game) {
+      throw new NotFoundException('房间不存在');
+    }
+
+    const player = game.players.find((p) => p.id === playerId);
+
+    if (!player) {
+      throw new NotFoundException('玩家不存在');
+    }
+
+    player.name = newNickname;
+
+    await this.playerRepository.save(player);
+
+    return player;
+  }
+
+  // 结束游戏
+  async endGame(roomCode: string): Promise<any> {
+    const game = await this.gameRepository.findOne({
+      where: { roomCode },
+      relations: ['players'],
+    });
+
+    if (!game) {
+      throw new NotFoundException('房间不存在');
+    }
+
+    game.status = 'ended';
+    await this.gameRepository.save(game);
+
+    const finalScores = game.players
+      .sort((a, b) => Number(b.balance) - Number(a.balance))
+      .map((p) => ({
+        playerId: p.id,
+        nickname: p.name,
+        score: p.balance,
+      }));
 
     return {
-      game,
-      playerStats,
+      message: '游戏已结束',
+      finalScores,
     };
   }
 
-  // 结束房间
-  async finishRoom(roomCode: string) {
+  // 删除游戏
+  async deleteGame(roomCode: string, requesterId: string): Promise<void> {
     const game = await this.gameRepository.findOne({
       where: { roomCode },
     });
@@ -294,66 +400,160 @@ export class GameService {
       throw new NotFoundException('房间不存在');
     }
 
-    game.status = 'completed';
-    await this.gameRepository.save(game);
+    const creatorIdentifier = game.userId
+      ? `user_${game.userId}`
+      : `guest_${game.guestId}`;
 
-    return this.getRoomDetail(roomCode);
+    if (creatorIdentifier !== requesterId) {
+      throw new BadRequestException('只有创建者可以删除房间');
+    }
+
+    await this.gameRepository.remove(game);
   }
 
   // 获取统计数据
-  async getStatistics(userId: number) {
-    const gameStats = await this.gameRepository
-      .createQueryBuilder('game')
-      .select('COUNT(game.id)', 'totalGames')
-      .addSelect(
-        'SUM(CASE WHEN game.status = "completed" THEN 1 ELSE 0 END)',
-        'completedGames',
-      )
-      .addSelect(
-        'SUM(CASE WHEN game.status = "active" THEN 1 ELSE 0 END)',
-        'activeGames',
-      )
-      .where('game.userId = :userId', { userId })
-      .getRawOne();
+  async getStats(playerId: string, playerType: string): Promise<any> {
+    // 验证参数
+    if (!playerId || !playerType) {
+      return {
+        totalGames: 0,
+        totalWins: 0,
+        totalLosses: 0,
+        totalDraws: 0,
+        winRate: 0,
+        totalScore: 0,
+        gameTypeStats: [],
+        recentGames: [],
+      };
+    }
 
-    const transactionStats = await this.transactionRepository
-      .createQueryBuilder('tx')
-      .innerJoin('tx.game', 'game')
-      .innerJoin('tx.fromPlayer', 'fromPlayer')
-      .innerJoin('tx.toPlayer', 'toPlayer')
-      .select('COUNT(tx.id)', 'totalTransactions')
-      .addSelect(
-        'SUM(CASE WHEN fromPlayer.userId = :userId THEN tx.amount ELSE 0 END)',
-        'totalSent',
-      )
-      .addSelect(
-        'SUM(CASE WHEN toPlayer.userId = :userId THEN tx.amount ELSE 0 END)',
-        'totalReceived',
-      )
-      .where('game.userId = :userId', { userId })
-      .setParameters({ userId })
-      .getRawOne();
+    let players: GamePlayer[];
 
-    const totalSent = parseFloat(transactionStats.totalSent) || 0;
-    const totalReceived = parseFloat(transactionStats.totalReceived) || 0;
+    try {
+      if (playerType === 'user') {
+        const userIdStr = playerId.replace('user_', '');
+        const userId = parseInt(userIdStr, 10);
 
-    return {
-      totalGames: parseInt(gameStats.totalGames) || 0,
-      completedGames: parseInt(gameStats.completedGames) || 0,
-      activeGames: parseInt(gameStats.activeGames) || 0,
-      totalTransactions: parseInt(transactionStats.totalTransactions) || 0,
-      totalSent,
-      totalReceived,
-      profit: totalReceived - totalSent,
-    };
+        if (isNaN(userId)) {
+          console.error('Invalid userId:', playerId);
+          return {
+            totalGames: 0,
+            totalWins: 0,
+            totalLosses: 0,
+            totalDraws: 0,
+            winRate: 0,
+            totalScore: 0,
+            gameTypeStats: [],
+            recentGames: [],
+          };
+        }
+
+        players = await this.playerRepository.find({
+          where: { userId },
+          relations: ['game'],
+          order: {
+            game: {
+              createdAt: 'DESC',
+            },
+          },
+        });
+      } else {
+        players = await this.playerRepository.find({
+          where: { guestId: playerId },
+          relations: ['game'],
+          order: {
+            game: {
+              createdAt: 'DESC',
+            },
+          },
+        });
+      }
+
+      const totalGames = players.length;
+      const totalWins = players.filter((p) => Number(p.balance) > 0).length;
+      const totalLosses = players.filter((p) => Number(p.balance) < 0).length;
+      const totalDraws = players.filter((p) => Number(p.balance) === 0).length;
+      const winRate =
+        totalGames > 0 ? ((totalWins / totalGames) * 100).toFixed(1) : 0;
+      const totalScore = players.reduce((sum, p) => sum + Number(p.balance), 0);
+
+      // 按游戏类型统计
+      const gameTypeMap = new Map();
+      players.forEach((p) => {
+        const type = p.game.gameType;
+        if (!gameTypeMap.has(type)) {
+          gameTypeMap.set(type, {
+            gameType: type,
+            count: 0,
+            totalScore: 0,
+            wins: 0,
+          });
+        }
+        const stat = gameTypeMap.get(type);
+        stat.count++;
+        stat.totalScore += Number(p.balance);
+        if (Number(p.balance) > 0) stat.wins++;
+      });
+
+      const gameTypeStats = Array.from(gameTypeMap.values()).map((stat) => ({
+        ...stat,
+        winRate:
+          stat.count > 0 ? ((stat.wins / stat.count) * 100).toFixed(1) : 0,
+      }));
+
+      // 最近游戏
+      const recentGames = players.slice(0, 10).map((p) => ({
+        id: p.game.id,
+        name: p.game.name,
+        roomCode: p.game.roomCode,
+        gameType: p.game.gameType,
+        score: p.balance,
+        status: p.game.status,
+        createdAt: p.game.createdAt,
+      }));
+
+      return {
+        totalGames,
+        totalWins,
+        totalLosses,
+        totalDraws,
+        winRate,
+        totalScore,
+        gameTypeStats,
+        recentGames,
+      };
+    } catch (error) {
+      console.error('Error in getStats:', error);
+      return {
+        totalGames: 0,
+        totalWins: 0,
+        totalLosses: 0,
+        totalDraws: 0,
+        winRate: 0,
+        totalScore: 0,
+        gameTypeStats: [],
+        recentGames: [],
+      };
+    }
   }
 
-  private generateRoomCode(): string {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let code = '';
-    for (let i = 0; i < 6; i++) {
-      code += chars.charAt(Math.floor(Math.random() * chars.length));
+  // 定时清理空房间（每小时执行）
+  @Cron(CronExpression.EVERY_HOUR)
+  async cleanupEmptyRooms(): Promise<void> {
+    const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000);
+
+    const emptyGames = await this.gameRepository
+      .createQueryBuilder('game')
+      .leftJoinAndSelect('game.players', 'player')
+      .where('game.createdAt < :threeHoursAgo', { threeHoursAgo })
+      .andWhere('game.status = :status', { status: 'active' })
+      .getMany();
+
+    const gamesToDelete = emptyGames.filter((game) => game.players.length < 2);
+
+    if (gamesToDelete.length > 0) {
+      await this.gameRepository.remove(gamesToDelete);
+      console.log(`✅ Cleaned up ${gamesToDelete.length} empty rooms`);
     }
-    return code;
   }
 }

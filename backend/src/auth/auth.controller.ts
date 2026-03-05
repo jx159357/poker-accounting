@@ -1,57 +1,69 @@
 import {
   Controller,
   Post,
+  Body,
   Get,
   Put,
-  Body,
   UseGuards,
   Request,
-  Headers,
 } from '@nestjs/common';
-import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
-import { RegisterDto } from './dto/register.dto';
-import { LoginDto } from './dto/login.dto';
-import { MigrateDto } from './dto/migrate.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(private readonly authService: AuthService) {}
 
   @Post('register')
-  @Throttle({ default: { limit: 3, ttl: 60000 } })
   async register(
-    @Body() registerDto: RegisterDto,
-    @Headers('x-guest-id') guestId: string,
+    @Body()
+    registerDto: {
+      username: string;
+      password: string;
+      nickname?: string;
+    },
   ) {
-    return this.authService.register(registerDto, guestId);
+    return this.authService.register(
+      registerDto.username,
+      registerDto.password,
+      registerDto.nickname,
+    );
   }
 
   @Post('login')
-  @Throttle({ default: { limit: 5, ttl: 60000 } })
-  async login(@Body() loginDto: LoginDto) {
-    return this.authService.login(loginDto);
+  async login(@Body() loginDto: { username: string; password: string }) {
+    return this.authService.login(loginDto.username, loginDto.password);
   }
 
-  @Get('me')
   @UseGuards(JwtAuthGuard)
-  async getMe(@Request() req) {
-    if (!req.user) {
-      return { user: null };
-    }
-    return this.authService.getUserInfo(req.user.userId);
+  @Get('profile')
+  async getProfile(@Request() req) {
+    return this.authService.getProfile(req.user.userId);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Put('profile')
-  @UseGuards(JwtAuthGuard)
-  async updateProfile(@Request() req, @Body() body: { nickname?: string }) {
-    return this.authService.updateProfile(req.user.userId, body);
+  async updateProfile(
+    @Request() req,
+    @Body() updateDto: { nickname?: string },
+  ) {
+    return this.authService.updateProfile(req.user.userId, updateDto);
   }
 
-  @Post('migrate')
+  @Post('guest-to-user')
+  async convertGuestToUser(
+    @Body() convertDto: { username: string; password: string; guestId: string },
+  ) {
+    return this.authService.convertGuestToUser(
+      convertDto.username,
+      convertDto.password,
+      convertDto.guestId,
+    );
+  }
+
   @UseGuards(JwtAuthGuard)
-  async migrate(@Request() req, @Body() migrateDto: MigrateDto) {
-    return this.authService.migrate(req.user.userId, migrateDto);
+  @Post('merge-guest')
+  async mergeGuestData(@Request() req, @Body() mergeDto: { guestId: string }) {
+    return this.authService.mergeGuestData(req.user.userId, mergeDto.guestId);
   }
 }

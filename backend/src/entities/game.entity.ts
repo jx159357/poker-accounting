@@ -6,43 +6,48 @@ import {
   OneToMany,
   CreateDateColumn,
   UpdateDateColumn,
-  Index,
 } from 'typeorm';
 import { User } from './user.entity';
 import { GamePlayer } from './game-player.entity';
-import { Transaction } from './transaction.entity';
+import { GameRecord } from './game-record.entity';
 
 @Entity()
-@Index(['userId', 'createdAt'])
 export class Game {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ unique: true })
-  roomCode: string;
-
   @Column()
   name: string;
 
-  @Column({ default: '德州扑克' })
+  @Column({ unique: true })
+  roomCode: string;
+
+  @Column({ default: '其他' })
   gameType: string;
 
   @Column({ default: 'active' })
   status: string;
 
   @Column({ nullable: true })
-  userId: number;
+  userId: number; // 创建者用户ID
 
-  @ManyToOne(() => User, (user) => user.games)
-  user: User;
+  @Column({ nullable: true })
+  guestId: string; // 创建者游客ID
 
-  @OneToMany(() => GamePlayer, (player) => player.game, { cascade: true })
+  @ManyToOne(() => User, { nullable: true })
+  creator: User;
+
+  @OneToMany(() => GamePlayer, (player) => player.game, {
+    cascade: true,
+    eager: true,
+  })
   players: GamePlayer[];
 
-  @OneToMany(() => Transaction, (transaction) => transaction.game, {
+  @OneToMany(() => GameRecord, (record) => record.game, {
     cascade: true,
+    eager: true,
   })
-  transactions: Transaction[];
+  gameRecords: GameRecord[];
 
   @CreateDateColumn()
   createdAt: Date;

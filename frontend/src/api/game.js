@@ -11,38 +11,43 @@ export const gameApi = {
     return request.post(`/game/join/${roomCode}`, data)
   },
 
+  // 获取游戏详情
+  getGameDetail(roomCode) {
+    return request.get(`/game/${roomCode}`)
+  },
+
   // 获取我的游戏列表
-  getMyGames() {
-    return request.get('/game/my-games')
+  getMyGames(params) {
+    return request.get('/game/my-games/list', { params })
   },
 
-  // 获取房间详情
-  getRoomDetail(roomCode) {
-    return request.get(`/game/room/${roomCode}`)
+  // 添加积分记录
+  addScore(roomCode, data) {
+    return request.post(`/game/${roomCode}/score`, data)
   },
 
-  // 添加转账
-  addTransaction(roomCode, data) {
-    return request.post(`/game/room/${roomCode}/transaction`, data)
+  // 撤销积分记录
+  undoScore(roomCode, recordId, data) {
+    return request.delete(`/game/${roomCode}/score/${recordId}`, { data })
   },
 
-  // 撤销转账
-  undoTransaction(roomCode, transactionId) {
-    return request.delete(`/game/room/${roomCode}/transaction/${transactionId}`)
+  // 更新玩家昵称
+  updatePlayerNickname(roomCode, playerId, data) {
+    return request.patch(`/game/${roomCode}/player/${playerId}/nickname`, data)
   },
 
-  // 结算房间
-  settleRoom(roomCode, data) {
-    return request.post(`/game/room/${roomCode}/settle`, data)
+  // 结束游戏
+  endGame(roomCode) {
+    return request.post(`/game/${roomCode}/end`)
   },
 
-  // 结束房间
-  finishRoom(roomCode) {
-    return request.post(`/game/room/${roomCode}/finish`)
+  // 删除游戏
+  deleteGame(roomCode, data) {
+    return request.delete(`/game/${roomCode}`, { data })
   },
 
   // 获取统计数据
-  getStatistics() {
-    return request.get('/game/statistics')
+  getStats(params) {
+    return request.get('/game/stats/data', { params })
   }
 }

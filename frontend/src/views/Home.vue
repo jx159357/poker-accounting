@@ -1,199 +1,267 @@
 <template>
-  <div class="min-h-screen bg-gray-50 pb-16">
+  <div class="h-screen flex flex-col bg-gray-50 overflow-hidden">
     <!-- 顶部导航 -->
-    <div class="bg-white shadow-sm">
-      <div class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-        <h1 class="text-2xl font-bold text-gray-800">打牌记账</h1>
-        <div class="flex items-center space-x-4">
-          <span class="text-gray-600 text-sm">{{ displayName }}</span>
-          <button
-            @click="router.push('/profile')"
-            class="text-blue-600 hover:text-blue-800 font-medium text-sm"
+    <van-nav-bar title="打牌记账" fixed placeholder>
+      <template #right>
+        <van-icon name="setting-o" size="20" @click="showSettings = true" />
+      </template>
+    </van-nav-bar>
+
+    <!-- 主要内容 -->
+    <div class="flex-1 flex flex-col overflow-hidden">
+      <!-- 快速操作 - 固定 -->
+      <div class="p-4 flex-shrink-0">
+        <div class="grid grid-cols-2 gap-3">
+          <van-button
+            type="primary"
+            size="large"
+            icon="plus"
+            block
+            @click="showCreateDialog = true"
           >
-            个人中心
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- 主内容 -->
-    <div class="max-w-7xl mx-auto px-4 py-8">
-      <!-- 游客提示 -->
-      <div v-if="userStore.isGuest" class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6 animate-fade-in">
-        <div class="flex items-start">
-          <svg class="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
-          </svg>
-          <div class="ml-3">
-            <p class="text-sm text-yellow-800">
-              您正在使用游客模式。
-              <button @click="router.push('/login')" class="underline font-medium hover:text-yellow-900">
-                登录
-              </button>
-              或
-              <button @click="router.push('/register')" class="underline font-medium hover:text-yellow-900">
-                注册
-              </button>
-              以同步数据。
-            </p>
-          </div>
+            创建房间
+          </van-button>
+          <van-button
+            type="success"
+            size="large"
+            icon="friends-o"
+            block
+            @click="showJoinDialog = true"
+          >
+            加入房间
+          </van-button>
         </div>
       </div>
 
-      <!-- 操作按钮 -->
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-        <button
-          @click="router.push('/create')"
-          class="bg-blue-600 text-white p-6 rounded-xl hover:bg-blue-700 transition shadow-lg hover:shadow-xl transform hover:-translate-y-1"
-        >
-          <svg class="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-          </svg>
-          <span class="text-lg font-semibold">创建游戏</span>
-        </button>
-
-        <button
-          @click="showJoinModal = true"
-          class="bg-green-600 text-white p-6 rounded-xl hover:bg-green-700 transition shadow-lg hover:shadow-xl transform hover:-translate-y-1"
-        >
-          <svg class="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
-          </svg>
-          <span class="text-lg font-semibold">加入游戏</span>
-        </button>
-      </div>
-
-      <!-- 我的游戏列表 -->
-      <div class="bg-white rounded-xl shadow-lg p-6">
-        <h2 class="text-xl font-bold text-gray-800 mb-4">我的游戏</h2>
-
-        <div v-if="gameStore.loading" class="text-center py-12 text-gray-500">
-          <van-loading size="36px" />
-          <p class="mt-2">加载中...</p>
+      <!-- 我的游戏列表 - 可滚动 -->
+      <div class="flex-1 overflow-y-auto px-4 pb-4">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-lg font-bold">我的游戏</h2>
+          <van-button
+            size="small"
+            type="primary"
+            plain
+            @click="loadGames"
+            :loading="gameStore.loading"
+          >
+            刷新
+          </van-button>
         </div>
 
-        <div v-else-if="gameStore.games.length === 0" class="text-center py-12 text-gray-500">
-          <svg class="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-          </svg>
-          <p class="text-lg font-medium">暂无游戏记录</p>
-          <p class="text-sm mt-2">创建或加入一个游戏开始记账吧！</p>
-        </div>
+        <van-loading v-if="gameStore.loading && !gameStore.myGames" class="py-8" />
+
+        <van-empty
+          v-else-if="!gameStore.myGames || gameStore.myGames.length === 0"
+          description="暂无游戏记录"
+        />
 
         <div v-else class="space-y-3">
           <div
-            v-for="game in gameStore.games"
+            v-for="game in gameStore.myGames"
             :key="game.id"
-            @click="router.push(`/room/${game.roomCode}`)"
-            class="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 cursor-pointer transition hover:shadow-md"
+            class="bg-white rounded-lg p-4 shadow-sm active:bg-gray-50 transition"
+            @click="goToRoom(game.roomCode)"
           >
-            <div class="flex justify-between items-start">
-              <div class="flex-1">
-                <h3 class="font-semibold text-gray-800 text-lg">{{ game.name }}</h3>
-                <div class="mt-2 space-y-1">
-                  <p class="text-sm text-gray-500">
-                    <span class="font-medium">房间号:</span> {{ game.roomCode }}
-                  </p>
-                  <p class="text-sm text-gray-500">
-                    <span class="font-medium">创建时间:</span> {{ formatDate(game.createdAt) }}
-                  </p>
+            <div class="flex items-center justify-between">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center">
+                  <h3 class="text-base font-semibold truncate">{{ game.name }}</h3>
+                  <van-tag
+                    :type="game.status === 'active' ? 'success' : 'default'"
+                    size="small"
+                    class="ml-2 flex-shrink-0"
+                  >
+                    {{ game.status === 'active' ? '进行中' : '已结束' }}
+                  </van-tag>
+                </div>
+                <div class="text-sm text-gray-500 mt-1">
+                  房间号: {{ game.roomCode }} · {{ game.gameType }}
+                </div>
+                <div class="text-sm text-gray-500 mt-1">
+                  {{ game.playerCount }} 人 · {{ formatDate(game.createdAt) }}
                 </div>
               </div>
-              <span
-                :class="game.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'"
-                class="px-3 py-1 rounded-full text-sm font-medium"
-              >
-                {{ game.status === 'active' ? '进行中' : '已结束' }}
-              </span>
+              <div class="text-right ml-4 flex-shrink-0">
+                <div
+                  :class="game.myScore >= 0 ? 'text-green-600' : 'text-red-600'"
+                  class="text-xl font-bold"
+                >
+                  {{ game.myScore >= 0 ? '+' : '' }}{{ game.myScore }}
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- 加入游戏弹窗 -->
+    <!-- 创建房间对话框 -->
     <van-dialog
-      v-model:show="showJoinModal"
-      title="加入游戏"
+      v-model:show="showCreateDialog"
+      title="创建房间"
       show-cancel-button
-      :before-close="handleJoinBeforeClose"
+      @confirm="handleCreateGame"
     >
-      <div class="px-4 py-2">
+      <div class="p-4">
         <van-field
-          v-model="joinRoomCode"
-          label="房间号"
-          placeholder="请输入6位房间号"
-          maxlength="6"
+          v-model="createForm.name"
+          label="房间名称"
+          placeholder="请输入房间名称"
+          required
         />
         <van-field
-          v-model="joinNickname"
-          label="昵称"
-          :placeholder="userStore.currentNickname"
+          v-model="createForm.gameType"
+          label="游戏类型"
+          placeholder="如：斗地主、麻将等"
         />
       </div>
     </van-dialog>
+
+    <!-- 加入房间对话框 -->
+    <van-dialog
+      v-model:show="showJoinDialog"
+      title="加入房间"
+      show-cancel-button
+      @confirm="handleJoinGame"
+    >
+      <div class="p-4">
+        <van-field
+          v-model="joinForm.roomCode"
+          label="房间号"
+          placeholder="请输入6位房间号"
+          maxlength="6"
+          required
+        />
+      </div>
+    </van-dialog>
+
+    <!-- 设置弹出层 -->
+    <van-popup v-model:show="showSettings" position="right" :style="{ width: '80%', height: '100%' }">
+      <div class="h-full flex flex-col">
+        <van-nav-bar
+          title="设置"
+          left-arrow
+          @click-left="showSettings = false"
+        />
+        <div class="flex-1 p-4">
+          <van-cell-group>
+            <van-cell title="用户信息" is-link @click="goToProfile" />
+            <van-cell
+              v-if="!userStore.isGuest"
+              title="退出登录"
+              @click="handleLogout"
+            />
+          </van-cell-group>
+        </div>
+      </div>
+    </van-popup>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { showToast } from 'vant'
-import { useUserStore } from '../stores/user'
-import { useGameStore } from '../stores/game'
+import { ref, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
+import { useGameStore } from '../stores/game';
+import { useUserStore } from '../stores/user';
+import { showToast } from 'vant';
 
-const router = useRouter()
-const userStore = useUserStore()
-const gameStore = useGameStore()
+const router = useRouter();
+const gameStore = useGameStore();
+const userStore = useUserStore();
 
-const showJoinModal = ref(false)
-const joinRoomCode = ref('')
-const joinNickname = ref('')
+const showCreateDialog = ref(false);
+const showJoinDialog = ref(false);
+const showSettings = ref(false);
 
-const displayName = computed(() => {
-  if (userStore.isGuest) return '游客模式'
-  return userStore.currentNickname || '用户'
-})
+const createForm = ref({
+  name: '',
+  gameType: '其他',
+});
 
+const joinForm = ref({
+  roomCode: '',
+});
+
+// 格式化日期
 const formatDate = (dateString) => {
-  const date = new Date(dateString)
-  return date.toLocaleString('zh-CN', {
-    year: 'numeric',
+  const date = new Date(dateString);
+  const now = new Date();
+  const diff = now - date;
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+
+  if (days === 0) return '今天';
+  if (days === 1) return '昨天';
+  if (days < 7) return `${days}天前`;
+
+  return date.toLocaleDateString('zh-CN', {
     month: '2-digit',
     day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-}
+  });
+};
 
-const handleJoinBeforeClose = async (action) => {
-  if (action === 'confirm') {
-    const code = joinRoomCode.value.trim().toUpperCase()
-    if (!code) {
-      showToast('请输入房间号')
-      return false
-    }
-    try {
-      const nickname = joinNickname.value.trim() || userStore.currentNickname
-      await gameStore.joinGame(code, nickname)
-      showToast('加入成功！')
-      router.push(`/room/${code}`)
-      joinRoomCode.value = ''
-      joinNickname.value = ''
-      return true
-    } catch (error) {
-      showToast(error.response?.data?.message || '加入失败')
-      return false
-    }
-  }
-  return true
-}
-
-onMounted(async () => {
+// 加载游戏列表
+const loadGames = async () => {
   try {
-    await gameStore.loadGames()
-  } catch {
-    // 静默处理
+    await gameStore.loadMyGames();
+  } catch (error) {
+    showToast(error.message || '加载失败');
   }
-})
+};
+
+// 创建游戏
+const handleCreateGame = async () => {
+  if (!createForm.value.name.trim()) {
+    showToast('请输入房间名称');
+    return;
+  }
+
+  try {
+    const game = await gameStore.createGame(
+      createForm.value.name,
+      createForm.value.gameType || '其他'
+    );
+    showToast('创建成功');
+    router.push(`/room/${game.roomCode}`);
+  } catch (error) {
+    showToast(error.message || '创建失败');
+  }
+};
+
+// 加入游戏
+const handleJoinGame = async () => {
+  if (!joinForm.value.roomCode.trim()) {
+    showToast('请输入房间号');
+    return;
+  }
+
+  try {
+    await gameStore.joinGame(joinForm.value.roomCode.toUpperCase());
+    showToast('加入成功');
+    router.push(`/room/${joinForm.value.roomCode.toUpperCase()}`);
+  } catch (error) {
+    showToast(error.message || '加入失败');
+  }
+};
+
+// 进入房间
+const goToRoom = (roomCode) => {
+  router.push(`/room/${roomCode}`);
+};
+
+// 进入个人中心
+const goToProfile = () => {
+  showSettings.value = false;
+  router.push('/profile');
+};
+
+// 退出登录
+const handleLogout = () => {
+  userStore.logout();
+  showToast('已退出登录');
+  router.push('/login');
+};
+
+onMounted(() => {
+  loadGames();
+});
 </script>

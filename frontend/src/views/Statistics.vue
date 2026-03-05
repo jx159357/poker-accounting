@@ -1,111 +1,132 @@
 <template>
-  <div class="min-h-screen bg-gray-50 pb-16">
-    <!-- 顶部导航 -->
-    <van-nav-bar title="统计数据" fixed />
+  <div class="min-h-screen bg-gray-50">
+    <van-nav-bar title="数据统计" left-arrow fixed placeholder @click-left="router.back()" />
 
-    <div class="pt-12 p-4">
-      <!-- 加载中 -->
-      <div v-if="loading" class="space-y-4">
-        <van-skeleton title :row="2" v-for="i in 3" :key="i" />
+    <div class="p-4">
+      <van-loading v-if="loading" class="py-8" />
+
+      <div v-else-if="stats" class="space-y-4">
+        <!-- 总体统计 -->
+        <div class="bg-white rounded-lg p-4 shadow-sm">
+          <h3 class="text-lg font-bold mb-3">总体数据</h3>
+          <div class="grid grid-cols-2 gap-4">
+            <div class="text-center">
+              <div class="text-2xl font-bold text-blue-600">{{ stats.totalGames }}</div>
+              <div class="text-sm text-gray-500 mt-1">总场次</div>
+            </div>
+            <div class="text-center">
+              <div class="text-2xl font-bold text-green-600">{{ stats.winRate }}%</div>
+              <div class="text-sm text-gray-500 mt-1">胜率</div>
+            </div>
+            <div class="text-center">
+              <div class="text-2xl font-bold text-purple-600">{{ stats.totalWins }}</div>
+              <div class="text-sm text-gray-500 mt-1">胜场</div>
+            </div>
+            <div class="text-center">
+              <div
+                :class="stats.totalScore >= 0 ? 'text-green-600' : 'text-red-600'"
+                class="text-2xl font-bold"
+              >
+                {{ stats.totalScore >= 0 ? '+' : '' }}{{ stats.totalScore }}
+              </div>
+              <div class="text-sm text-gray-500 mt-1">总积分</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 按游戏类型统计 -->
+        <div v-if="stats.gameTypeStats && stats.gameTypeStats.length > 0" class="bg-white rounded-lg p-4 shadow-sm">
+          <h3 class="text-lg font-bold mb-3">游戏类型统计</h3>
+          <div class="space-y-3">
+            <div
+              v-for="stat in stats.gameTypeStats"
+              :key="stat.gameType"
+              class="flex items-center justify-between p-3 bg-gray-50 rounded"
+            >
+              <div>
+                <div class="font-semibold">{{ stat.gameType }}</div>
+                <div class="text-sm text-gray-500 mt-1">
+                  {{ stat.count }} 场 · 胜率 {{ stat.winRate }}%
+                </div>
+              </div>
+              <div
+                :class="stat.totalScore >= 0 ? 'text-green-600' : 'text-red-600'"
+                class="text-xl font-bold"
+              >
+                {{ stat.totalScore >= 0 ? '+' : '' }}{{ stat.totalScore }}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 最近游戏 -->
+        <div v-if="stats.recentGames && stats.recentGames.length > 0" class="bg-white rounded-lg p-4 shadow-sm">
+          <h3 class="text-lg font-bold mb-3">最近游戏</h3>
+          <div class="space-y-2">
+            <div
+              v-for="game in stats.recentGames"
+              :key="game.id"
+              class="flex items-center justify-between p-2 border-b last:border-b-0"
+              @click="goToRoom(game.roomCode)"
+            >
+              <div class="flex-1">
+                <div class="font-medium">{{ game.name }}</div>
+                <div class="text-xs text-gray-500 mt-1">
+                  {{ game.gameType }} · {{ formatDate(game.createdAt) }}
+                </div>
+              </div>
+              <div
+                :class="game.score >= 0 ? 'text-green-600' : 'text-red-600'"
+                class="font-bold"
+              >
+                {{ game.score >= 0 ? '+' : '' }}{{ game.score }}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <template v-else>
-        <!-- 总览卡片 -->
-        <div class="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl p-6 text-white mb-6 shadow-lg">
-          <h2 class="text-lg font-medium opacity-90 mb-4">净盈亏</h2>
-          <div class="text-4xl font-bold mb-1">
-            {{ stats.profit >= 0 ? '+' : '' }}&yen;{{ stats.profit.toFixed(2) }}
-          </div>
-          <p class="text-sm opacity-75 mt-2">
-            共 {{ stats.totalGames }} 局游戏 | {{ stats.totalTransactions }} 笔转账
-          </p>
-        </div>
-
-        <!-- 统计详情卡片 -->
-        <div class="grid grid-cols-2 gap-4 mb-6">
-          <div class="bg-white rounded-xl p-4 shadow-sm">
-            <div class="text-sm text-gray-500 mb-1">总转出</div>
-            <div class="text-xl font-bold text-orange-600">&yen;{{ stats.totalSent.toFixed(2) }}</div>
-          </div>
-          <div class="bg-white rounded-xl p-4 shadow-sm">
-            <div class="text-sm text-gray-500 mb-1">总转入</div>
-            <div class="text-xl font-bold text-green-600">&yen;{{ stats.totalReceived.toFixed(2) }}</div>
-          </div>
-          <div class="bg-white rounded-xl p-4 shadow-sm">
-            <div class="text-sm text-gray-500 mb-1">已完成</div>
-            <div class="text-xl font-bold text-gray-800">{{ stats.completedGames }} 局</div>
-          </div>
-          <div class="bg-white rounded-xl p-4 shadow-sm">
-            <div class="text-sm text-gray-500 mb-1">进行中</div>
-            <div class="text-xl font-bold text-blue-600">{{ stats.activeGames }} 局</div>
-          </div>
-        </div>
-
-        <!-- 转入/转出比例条 -->
-        <div v-if="stats.totalSent > 0 || stats.totalReceived > 0" class="bg-white rounded-xl p-6 shadow-sm mb-6">
-          <h3 class="text-base font-semibold text-gray-800 mb-4">转出/转入比例</h3>
-          <div class="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
-            <div
-              class="h-full rounded-full transition-all duration-500"
-              :class="stats.profit >= 0 ? 'bg-green-500' : 'bg-red-500'"
-              :style="{ width: profitBarWidth + '%' }"
-            ></div>
-          </div>
-          <div class="flex justify-between mt-2 text-xs text-gray-500">
-            <span>转出: &yen;{{ stats.totalSent.toFixed(0) }}</span>
-            <span>转入: &yen;{{ stats.totalReceived.toFixed(0) }}</span>
-          </div>
-        </div>
-
-        <!-- 空状态 -->
-        <van-empty
-          v-if="stats.totalGames === 0"
-          image="search"
-          description="暂无统计数据，开始一局游戏吧"
-        />
-      </template>
+      <van-empty v-else description="暂无数据" />
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { showToast } from 'vant'
-import { useUserStore } from '../stores/user'
-import { gameApi } from '../api/game'
+import { ref, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
+import { useGameStore } from '../stores/game';
+import { showToast } from 'vant';
 
-const userStore = useUserStore()
-const loading = ref(false)
+const router = useRouter();
+const gameStore = useGameStore();
 
-const stats = ref({
-  totalGames: 0,
-  completedGames: 0,
-  activeGames: 0,
-  totalTransactions: 0,
-  totalSent: 0,
-  totalReceived: 0,
-  profit: 0
-})
+const loading = ref(false);
+const stats = ref(null);
 
-const profitBarWidth = computed(() => {
-  const total = stats.value.totalSent + stats.value.totalReceived
-  if (total === 0) return 50
-  return Math.min(95, Math.max(5, (stats.value.totalReceived / total) * 100))
-})
+const formatDate = (dateString) => {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+  });
+};
 
-onMounted(async () => {
-  if (!userStore.isLoggedIn) {
-    return
-  }
+const goToRoom = (roomCode) => {
+  router.push(`/room/${roomCode}`);
+};
 
-  loading.value = true
+const loadStats = async () => {
+  loading.value = true;
   try {
-    const data = await gameApi.getStatistics()
-    stats.value = data
-  } catch {
-    showToast('加载统计数据失败')
+    stats.value = await gameStore.getStats();
+  } catch (error) {
+    showToast(error.message || '加载失败');
   } finally {
-    loading.value = false
+    loading.value = false;
   }
-})
+};
+
+onMounted(() => {
+  loadStats();
+});
 </script>

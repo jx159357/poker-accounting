@@ -11,10 +11,7 @@ import * as bcrypt from 'bcrypt';
 import { User } from '../entities/user.entity';
 import { Game } from '../entities/game.entity';
 import { GamePlayer } from '../entities/game-player.entity';
-import { Transaction } from '../entities/transaction.entity';
-import { RegisterDto } from './dto/register.dto';
-import { LoginDto } from './dto/login.dto';
-import { MigrateDto } from './dto/migrate.dto';
+import { GameRecord } from '../entities/game-record.entity';
 
 @Injectable()
 export class AuthService {
@@ -25,65 +22,79 @@ export class AuthService {
     private gameRepository: Repository<Game>,
     @InjectRepository(GamePlayer)
     private gamePlayerRepository: Repository<GamePlayer>,
-    @InjectRepository(Transaction)
-    private transactionRepository: Repository<Transaction>,
+    @InjectRepository(GameRecord)
+    private gameRecordRepository: Repository<GameRecord>,
     private jwtService: JwtService,
   ) {}
 
-  async register(registerDto: RegisterDto, guestId?: string) {
+  // 注册
+  async register(username: string, password: string, nickname?: string) {
+    // 检查用户名是否已存在
     const existingUser = await this.userRepository.findOne({
-      where: { username: registerDto.username },
+      where: { username },
     });
 
     if (existingUser) {
       throw new ConflictException('用户名已存在');
     }
 
-    const hashedPassword = await bcrypt.hash(registerDto.password, 10);
+    // 加密密码
+    const hashedPassword = await bcrypt.hash(password, 10);
 
+    // 创建用户
     const user = this.userRepository.create({
-      username: registerDto.username,
+      username,
       password: hashedPassword,
-      nickname: registerDto.username,
+      nickname: nickname || username,
     });
 
     await this.userRepository.save(user);
 
-    // 如果有 guestId，迁移游客数据
-    if (guestId) {
-      await this.migrateGuestData(user.id, guestId);
-    }
+    // 生成 token
+    const payload = {
+      sub: user.id,
+      username: user.username,
+      nickname: user.nickname || user.username,
+    };
+    const access_token = this.jwtService.sign(payload);
 
-    const payload = { username: user.username, sub: user.id };
     return {
-      access_token: this.jwtService.sign(payload),
-      user: {
-        id: user.id,
-        username: user.username,
-        nickname: user.nickname,
-      },
+      access_token,
+      username: user.username,
+      nickname: user.nickname || user.username,
     };
   }
 
-  async login(loginDto: LoginDto) {
-    const user = await this.validateUser(loginDto.username, loginDto.password);
+  // 登录
+  async login(username: string, password: string) {
+    const user = await this.userRepository.findOne({ where: { username } });
 
     if (!user) {
       throw new UnauthorizedException('用户名或密码错误');
     }
 
-    const payload = { username: user.username, sub: user.id };
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('用户名或密码错误');
+    }
+
+    const payload = {
+      sub: user.id,
+      username: user.username,
+      nickname: user.nickname || user.username,
+    };
+    const access_token = this.jwtService.sign(payload);
+
     return {
-      access_token: this.jwtService.sign(payload),
-      user: {
-        id: user.id,
-        username: user.username,
-        nickname: user.nickname || user.username,
-      },
+      access_token,
+      username: user.username,
+      nickname: user.nickname || user.username,
     };
   }
 
-  async getUserInfo(userId: number) {
+  // 获取用户信息
+  async getProfile(userId: number) {
     const user = await this.userRepository.findOne({ where: { id: userId } });
 
     if (!user) {
@@ -94,9 +105,11 @@ export class AuthService {
       id: user.id,
       username: user.username,
       nickname: user.nickname || user.username,
+      createdAt: user.createdAt,
     };
   }
 
+  // 更新用户信息
   async updateProfile(userId: number, data: { nickname?: string }) {
     const user = await this.userRepository.findOne({ where: { id: userId } });
 
@@ -117,102 +130,124 @@ export class AuthService {
     };
   }
 
-  async validateUser(username: string, password: string) {
-    const user = await this.userRepository.findOne({ where: { username } });
+  // 游客转注册用户
+  async convertGuestToUser(
+    username: string,
+    password: string,
+    guestId: string,
+  ) {
+    // 检查用户名是否已存在
+    const existingUser = await this.userRepository.findOne({
+      where: { username },
+    });
 
-    if (user && (await bcrypt.compare(password, user.password))) {
-      const { password: _, ...result } = user;
-      return result;
+    if (existingUser) {
+      throw new ConflictException('用户名已存在');
     }
 
-    return null;
-  }
+    // 加密密码
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-  // 迁移游客数据到注册用户
-  private async migrateGuestData(userId: number, guestId: string) {
-    // 更新游客创建的游戏的 userId
+    // 创建用户
+    const user = this.userRepository.create({
+      username,
+      password: hashedPassword,
+      nickname: username,
+    });
+
+    await this.userRepository.save(user);
+
+    // 更新游客的游戏记录
     await this.gamePlayerRepository
       .createQueryBuilder()
       .update(GamePlayer)
-      .set({ userId })
+      .set({ userId: user.id, guestId: null })
       .where('guestId = :guestId', { guestId })
       .execute();
-  }
 
-  // 游客数据迁移（批量）
-  async migrate(userId: number, migrateDto: MigrateDto) {
-    const user = await this.userRepository.findOne({ where: { id: userId } });
+    // 更新游客创建的游戏
+    await this.gameRepository
+      .createQueryBuilder()
+      .update(Game)
+      .set({ userId: user.id, guestId: null })
+      .where('guestId = :guestId', { guestId })
+      .execute();
 
-    if (!user) {
-      throw new UnauthorizedException('用户不存在');
-    }
-
-    const migratedGames = [];
-
-    for (const guestGame of migrateDto.games) {
-      try {
-        const roomCode = this.generateRoomCode();
-
-        const game = this.gameRepository.create({
-          roomCode,
-          name: guestGame.name,
-          userId: user.id,
-          status: guestGame.status || 'completed',
-          createdAt: guestGame.createdAt
-            ? new Date(guestGame.createdAt)
-            : new Date(),
-        });
-
-        await this.gameRepository.save(game);
-
-        const playerIdMap = new Map<string, number>();
-
-        for (const playerName of guestGame.players) {
-          const player = this.gamePlayerRepository.create({
-            name: playerName,
-            gameId: game.id,
-            userId: user.id,
-          });
-          await this.gamePlayerRepository.save(player);
-          playerIdMap.set(playerName, player.id);
-        }
-
-        // 迁移旧的 records 为 transactions（如果有的话）
-        if (guestGame.records) {
-          for (const record of guestGame.records) {
-            const dbPlayerId = playerIdMap.get(record.playerId);
-            // 旧数据格式不兼容新的转账模式，跳过
-            if (dbPlayerId) {
-              // 旧的 buy_in/cash_out 记录无法直接映射为转账，仅迁移游戏和玩家
-            }
-          }
-        }
-
-        migratedGames.push({
-          guestId: guestGame.id,
-          dbId: game.id,
-          roomCode: game.roomCode,
-          name: game.name,
-        });
-      } catch (error) {
-        console.error(`迁移游戏 ${guestGame.name} 失败:`, error);
-      }
-    }
+    // 生成 token
+    const payload = {
+      sub: user.id,
+      username: user.username,
+      nickname: user.nickname,
+    };
+    const access_token = this.jwtService.sign(payload);
 
     return {
-      message: '数据迁移成功',
-      migratedCount: migratedGames.length,
-      totalCount: migrateDto.games.length,
-      games: migratedGames,
+      access_token,
+      username: user.username,
+      nickname: user.nickname,
     };
   }
 
-  private generateRoomCode(): string {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let code = '';
-    for (let i = 0; i < 6; i++) {
-      code += chars.charAt(Math.floor(Math.random() * chars.length));
+  // 合并游客数据到已有用户
+  async mergeGuestData(userId: number, guestId: string) {
+    // 查找游客的所有游戏玩家记录
+    const guestPlayers = await this.gamePlayerRepository.find({
+      where: { guestId },
+      relations: ['game'],
+    });
+
+    for (const guestPlayer of guestPlayers) {
+      // 检查用户是否已经在这个游戏中
+      const existingPlayer = await this.gamePlayerRepository.findOne({
+        where: {
+          userId,
+          game: { id: guestPlayer.game.id },
+        },
+      });
+
+      if (existingPlayer) {
+        // 如果已存在，合并余额
+        existingPlayer.balance =
+          Number(existingPlayer.balance) + Number(guestPlayer.balance);
+        await this.gamePlayerRepository.save(existingPlayer);
+
+        // 更新游戏记录中的玩家引用
+        await this.gameRecordRepository
+          .createQueryBuilder()
+          .update(GameRecord)
+          .set({ fromPlayer: existingPlayer })
+          .where('fromPlayer = :guestPlayerId', {
+            guestPlayerId: guestPlayer.id,
+          })
+          .execute();
+
+        await this.gameRecordRepository
+          .createQueryBuilder()
+          .update(GameRecord)
+          .set({ toPlayer: existingPlayer })
+          .where('toPlayer = :guestPlayerId', {
+            guestPlayerId: guestPlayer.id,
+          })
+          .execute();
+
+        // 删除游客玩家记录
+        await this.gamePlayerRepository.remove(guestPlayer);
+      } else {
+        // 如果不存在，直接转换
+        guestPlayer.userId = userId;
+        guestPlayer.guestId = null;
+        await this.gamePlayerRepository.save(guestPlayer);
+      }
     }
-    return code;
+
+    // 更新游客创建的游戏
+    await this.gameRepository
+      .createQueryBuilder()
+      .update(Game)
+      .set({ userId, guestId: null })
+      .where('guestId = :guestId', { guestId })
+      .execute();
+
+    return { message: '数据合并成功' };
   }
 }

@@ -1,4 +1,10 @@
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  OneToMany,
+  CreateDateColumn,
+} from 'typeorm';
 import { Game } from './game.entity';
 
 @Entity()
@@ -13,8 +19,11 @@ export class User {
   password: string;
 
   @Column({ nullable: true })
-  nickname: string;
+  nickname: string; // 添加昵称字段
 
-  @OneToMany(() => Game, (game) => game.user)
+  @OneToMany(() => Game, (game) => game.creator)
   games: Game[];
+
+  @CreateDateColumn()
+  createdAt: Date;
 }

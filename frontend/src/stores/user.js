@@ -1,126 +1,127 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { authApi } from '../api/auth'
-import { generateUUID } from '@/utils/utils.js'
-
-// 生成或获取游客 ID
-function getOrCreateGuestId() {
-  let guestId = localStorage.getItem('guestId')
-  if (!guestId) {
-    guestId = 'guest_' + generateUUID()
-    localStorage.setItem('guestId', guestId)
-  }
-  return guestId
-}
 
 export const useUserStore = defineStore('user', () => {
+  // 从 localStorage 初始化状态
   const token = ref(localStorage.getItem('token') || '')
-  const userInfo = ref(null)
-  const guestId = ref(getOrCreateGuestId())
+  const username = ref(localStorage.getItem('username') || '')
+  const isGuest = ref(localStorage.getItem('isGuest') === 'true')
   const loading = ref(false)
 
-  const isLoggedIn = computed(() => !!token.value)
-  const isGuest = computed(() => !token.value)
+  // 初始化函数 - 确保从 localStorage 恢复状态
+  const init = () => {
+    const savedToken = localStorage.getItem('token')
+    const savedUsername = localStorage.getItem('username')
+    const savedIsGuest = localStorage.getItem('isGuest')
 
-  const currentNickname = computed(() => {
-    if (userInfo.value) return userInfo.value.nickname || userInfo.value.username
-    return localStorage.getItem('guestNickname') || '游客'
-  })
-
-  const currentUserId = computed(() => {
-    if (userInfo.value) return String(userInfo.value.id)
-    return guestId.value
-  })
-
-  const currentGuestId = computed(() => guestId.value)
-
-  const username = computed(() => {
-    return userInfo.value?.username || ''
-  })
-
-  // 登录
-  const login = async (user, pass) => {
-    loading.value = true
-    try {
-      const data = await authApi.login({ username: user, password: pass })
-      token.value = data.access_token
-      userInfo.value = data.user
-      localStorage.setItem('token', data.access_token)
-    } finally {
-      loading.value = false
+    if (savedToken) {
+      token.value = savedToken
     }
+    if (savedUsername) {
+      username.value = savedUsername
+    }
+    if (savedIsGuest !== null) {
+      isGuest.value = savedIsGuest === 'true'
+    }
+
+    console.log('User store initialized:', {
+      token: !!token.value,
+      username: username.value,
+      isGuest: isGuest.value
+    })
   }
 
   // 注册
-  const register = async (user, pass) => {
+  const register = async (usernameInput, password) => {
     loading.value = true
     try {
-      const data = await authApi.register({ username: user, password: pass })
+      const data = await authApi.register({
+        username: usernameInput,
+        password
+      })
+
       token.value = data.access_token
-      userInfo.value = data.user
+      username.value = data.username
+      isGuest.value = false
+
       localStorage.setItem('token', data.access_token)
+      localStorage.setItem('username', data.username)
+      localStorage.setItem('isGuest', 'false')
+
+      console.log('Registered successfully:', data.username)
+    } catch (error) {
+      throw new Error(error.response?.data?.message || '注册失败')
     } finally {
       loading.value = false
     }
   }
 
-  // 获取用户信息
-  const getUserInfo = async () => {
-    if (!token.value) return
+  // 登录
+  const login = async (usernameInput, password) => {
+    loading.value = true
     try {
-      const data = await authApi.getUserInfo()
-      userInfo.value = data
-    } catch {
-      // token 无效，清除
-      logout()
+      const data = await authApi.login({
+        username: usernameInput,
+        password
+      })
+
+      token.value = data.access_token
+      username.value = data.username
+      isGuest.value = false
+
+      localStorage.setItem('token', data.access_token)
+      localStorage.setItem('username', data.username)
+      localStorage.setItem('isGuest', 'false')
+
+      console.log('Logged in successfully:', data.username)
+    } catch (error) {
+      throw new Error(error.response?.data?.message || '登录失败')
+    } finally {
+      loading.value = false
     }
   }
 
-  // 更新昵称
-  const updateNickname = async (nickname) => {
-    if (isLoggedIn.value) {
-      const data = await authApi.updateProfile({ nickname })
-      userInfo.value = data
-    } else {
-      localStorage.setItem('guestNickname', nickname)
-    }
+  // 游客模式
+  const setGuestMode = () => {
+    isGuest.value = true
+    token.value = ''
+    username.value = ''
+
+    localStorage.setItem('isGuest', 'true')
+    localStorage.removeItem('token')
+    localStorage.removeItem('username')
+
+    console.log('Guest mode activated')
   }
 
   // 退出登录
   const logout = () => {
     token.value = ''
-    userInfo.value = null
+    username.value = ''
+    isGuest.value = false
+
     localStorage.removeItem('token')
+    localStorage.removeItem('username')
+    localStorage.removeItem('isGuest')
+    localStorage.removeItem('guestId')
+    localStorage.removeItem('guestNickname')
+
+    console.log('Logged out')
   }
 
-  // 设置游客模式（兼容旧逻辑）
-  const setGuestMode = () => {
-    token.value = ''
-    userInfo.value = null
-    localStorage.removeItem('token')
-  }
-
-  // 初始化：如果有 token 则获取用户信息
-  if (token.value) {
-    getUserInfo()
-  }
+  // 页面加载时初始化
+  init()
 
   return {
     token,
-    userInfo,
-    guestId,
-    loading,
-    isLoggedIn,
-    isGuest,
-    currentNickname,
-    currentUserId,
-    currentGuestId,
     username,
-    login,
+    isGuest,
+    loading,
+    init,
     register,
-    getUserInfo,
-    updateNickname,
-    logout,
-    setGuestMode
+    login,
+    setGuestMode,
+    logout
   }
 })

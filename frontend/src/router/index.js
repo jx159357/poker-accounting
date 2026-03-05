@@ -1,12 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import Home from '../views/Home.vue'
-import Login from '../views/Login.vue'
-import Register from '../views/Register.vue'
-import Room from '../views/Room.vue'
-import Profile from '../views/Profile.vue'
-import CreateGame from '../views/CreateGame.vue'
-import History from '../views/History.vue'
-import Statistics from '../views/Statistics.vue'
+import { useUserStore } from '../stores/user'
 
 const routes = [
   {
@@ -14,50 +7,77 @@ const routes = [
     redirect: '/home'
   },
   {
-    path: '/home',
-    name: 'Home',
-    component: Home
-  },
-  {
     path: '/login',
     name: 'Login',
-    component: Login
+    component: () => import('../views/Login.vue')
   },
   {
     path: '/register',
     name: 'Register',
-    component: Register
+    component: () => import('../views/Register.vue')
   },
   {
-    path: '/create',
-    name: 'CreateGame',
-    component: CreateGame
+    path: '/home',
+    name: 'Home',
+    component: () => import('../views/Home.vue'),
+    meta: { requiresAuth: false }
   },
   {
     path: '/room/:roomCode',
-    name: 'Room',
-    component: Room
-  },
-{
-    path: '/history',
-    name: 'History',
-    component: History
-  },
-  {
-    path: '/statistics',
-    name: 'Statistics',
-    component: Statistics
+    name: 'GameRoom',
+    component: () => import('../views/GameRoom.vue'),
+    meta: { requiresAuth: false }
   },
   {
     path: '/profile',
     name: 'Profile',
-    component: Profile
+    component: () => import('../views/Profile.vue'),
+    meta: { requiresAuth: false }
+  },
+  {
+    path: '/history',
+    name: 'History',
+    component: () => import('../views/History.vue'),
+    meta: { requiresAuth: false }
+  },
+  {
+    path: '/statistics',
+    name: 'Statistics',
+    component: () => import('../views/Statistics.vue'),
+    meta: { requiresAuth: false }
   }
 ]
 
 const router = createRouter({
   history: createWebHistory(),
   routes
+})
+
+// 路由守卫
+router.beforeEach((to, from, next) => {
+  const userStore = useUserStore()
+
+  console.log('Route guard:', {
+    to: to.path,
+    isGuest: userStore.isGuest,
+    hasToken: !!userStore.token,
+    username: userStore.username
+  })
+
+  // 如果访问登录页或注册页，直接放行
+  if (to.path === '/login' || to.path === '/register') {
+    next()
+    return
+  }
+
+  // 如果没有 token 且不是游客，跳转到登录页
+  if (!userStore.token && !userStore.isGuest) {
+    console.log('No auth, redirecting to login')
+    next('/login')
+    return
+  }
+
+  next()
 })
 
 export default router
