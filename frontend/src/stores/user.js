@@ -1,12 +1,13 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { authApi } from '../api/auth'
+import { generateUUID } from '@/utils/utils.js'
 
 // 生成或获取游客 ID
 function getOrCreateGuestId() {
   let guestId = localStorage.getItem('guestId')
   if (!guestId) {
-    guestId = 'guest_' + crypto.randomUUID()
+    guestId = 'guest_' + generateUUID()
     localStorage.setItem('guestId', guestId)
   }
   return guestId
