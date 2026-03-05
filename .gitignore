@@ -114,3 +114,12 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+
+
+# 数据库文件
+*.db
+*.sqlite
+*.sqlite3
+
+# 开发环境数据
+backend/poker.db
