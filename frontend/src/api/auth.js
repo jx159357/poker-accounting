@@ -1,23 +1,28 @@
 import request from '../utils/request'
 
 export const authApi = {
-  // 注册
   register(data) {
     return request.post('/auth/register', data)
   },
-
-  // 登录
   login(data) {
     return request.post('/auth/login', data)
   },
-
-  // 获取用户信息
-  getUserInfo() {
-    return request.get('/auth/me')
+  getProfile() {
+    return request.get('/auth/profile')
   },
-
-  // 更新个人资料（昵称）
   updateProfile(data) {
     return request.put('/auth/profile', data)
+  },
+  guestToUser(data) {
+    return request.post('/auth/guest-to-user', data)
+  },
+  mergeGuest(data) {
+    return request.post('/auth/merge-guest', data)
+  },
+  changePassword(data) {
+    return request.put('/auth/password', data)
+  },
+  getAchievements() {
+    return request.get('/auth/achievements')
   }
 }

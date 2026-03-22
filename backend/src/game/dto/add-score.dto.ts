@@ -1,16 +1,20 @@
 import { IsNumber, IsString, IsOptional } from 'class-validator';
+import { Type } from 'class-transformer';
 
-export class CreateTransactionDto {
+export class AddScoreDto {
+  @Type(() => Number)
   @IsNumber()
   fromPlayerId: number;
 
+  @Type(() => Number)
   @IsNumber()
   toPlayerId: number;
 
+  @Type(() => Number)
   @IsNumber()
-  amount: number;
+  score: number;
 
   @IsString()
   @IsOptional()
-  remark?: string;
+  note?: string;
 }

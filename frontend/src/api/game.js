@@ -41,6 +41,11 @@ export const gameApi = {
     return request.post(`/game/${roomCode}/end`)
   },
 
+  // 编辑游戏
+  editGame(roomCode, data) {
+    return request.patch(`/game/${roomCode}`, data)
+  },
+
   // 删除游戏
   deleteGame(roomCode, data) {
     return request.delete(`/game/${roomCode}`, { data })
@@ -49,5 +54,15 @@ export const gameApi = {
   // 获取统计数据
   getStats(params) {
     return request.get('/game/stats/data', { params })
+  },
+
+  // 获取对手统计
+  getOpponentStats(params) {
+    return request.get('/game/stats/opponents', { params })
+  },
+
+  // 获取排行榜
+  getLeaderboard(params) {
+    return request.get('/game/stats/leaderboard', { params })
   }
 }

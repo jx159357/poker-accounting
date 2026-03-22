@@ -1,5 +1,7 @@
 {
-  "dependencies": {
-    "20": "^3.1.9"
+  "scripts": {
+    "dev": "cd frontend && npm run dev",
+    "build": "cd frontend && npm run build && cd ../backend && npm run build",
+    "start": "cd backend && npm run start:prod"
   }
 }

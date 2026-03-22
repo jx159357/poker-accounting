@@ -1,6 +1,6 @@
-import { IsString, MinLength, IsOptional } from 'class-validator';
+import { IsString, MinLength } from 'class-validator';
 
-export class RegisterDto {
+export class GuestToUserDto {
   @IsString()
   @MinLength(3, { message: '用户名至少3个字符' })
   username: string;
@@ -10,6 +10,5 @@ export class RegisterDto {
   password: string;
 
   @IsString()
-  @IsOptional()
-  nickname?: string;
+  guestId: string;
 }

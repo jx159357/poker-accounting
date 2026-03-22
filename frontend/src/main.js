@@ -2,6 +2,7 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import App from './App.vue'
 import router from './router'
+import './assets/theme.css'
 import './style.css'
 
 // Vant 组件
@@ -24,7 +25,8 @@ import {
   Image as VanImage,
   Picker,
   ActionSheet,
-  Checkbox
+  Checkbox,
+  Progress
 } from 'vant'
 import 'vant/lib/index.css'
 
@@ -54,5 +56,6 @@ app.use(VanImage)
 app.use(Picker)
 app.use(ActionSheet)
 app.use(Checkbox)
+app.use(Progress)
 
 app.mount('#app')

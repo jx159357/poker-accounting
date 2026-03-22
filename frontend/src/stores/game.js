@@ -2,6 +2,8 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { useUserStore } from './user'
 import { gameApi } from '../api/game'
+import { authApi } from '../api/auth'
+import { showToast } from 'vant'
 
 export const useGameStore = defineStore('game',() => {
   const userStore = useUserStore()
@@ -9,6 +11,12 @@ export const useGameStore = defineStore('game',() => {
   const currentGame = ref(null)
   const myGames = ref([])
   const loading = ref(false)
+
+  // 统计缓存（5 分钟过期）
+  const CACHE_TTL = 5 * 60 * 1000
+  const statsCache = ref({ data: null, ts: 0 })
+  const opponentsCache = ref({ data: null, ts: 0 })
+  const leaderboardCache = ref({ data: null, ts: 0 })
 
   // 获取或生成玩家ID
   const getPlayerId = () => {
@@ -18,7 +26,6 @@ export const useGameStore = defineStore('game',() => {
         guestId = `guest_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
         localStorage.setItem('guestId', guestId)
       }
-      console.log('Guest playerId:', guestId)
       return guestId
     } else {
       // 确保返回正确的格式
@@ -28,13 +35,11 @@ export const useGameStore = defineStore('game',() => {
         // 尝试从 localStorage 恢复
         const savedUsername = localStorage.getItem('username')
         if (savedUsername) {
-          console.log('Recovered username from localStorage:', savedUsername)
           userStore.username = savedUsername
           return `user_${savedUsername}`
         }
         return null
       }
-      console.log('User playerId:', `user_${username}`)
       return `user_${username}`
     }
   }
@@ -75,7 +80,12 @@ export const useGameStore = defineStore('game',() => {
       currentGame.value = game
       return game
     } catch (error) {
-      throw new Error(error.response?.data?.message || '创建游戏失败')
+      const message = error.response?.data?.message || '创建游戏失败'
+      const err = new Error(message)
+      if (message.includes('GUEST_LIMIT_REACHED') || error.response?.data?.code === 'GUEST_LIMIT_REACHED') {
+        err.code = 'GUEST_LIMIT_REACHED'
+      }
+      throw err
     } finally {
       loading.value = false
     }
@@ -123,9 +133,9 @@ export const useGameStore = defineStore('game',() => {
     loading.value = true
     try {
       await gameApi.addScore(roomCode, {
-        fromPlayerId,
-        toPlayerId,
-        score,
+        fromPlayerId: Number(fromPlayerId),
+        toPlayerId: Number(toPlayerId),
+        score: Number(score),
         note
       })
 
@@ -139,20 +149,20 @@ export const useGameStore = defineStore('game',() => {
   }
 
   // 撤销积分记录
-  const undoScore = (roomCode, recordId) => {
-    const headers = {}
-    // 如果是游客，添加游客ID到请求头
-    const guestId = localStorage.getItem('guestId')
-    if (guestId) {
-      headers['X-Guest-Id'] = guestId
+  const undoScore = async (roomCode, recordId) => {
+    try {
+      const playerId = getPlayerId()
+      await gameApi.undoScore(roomCode, recordId, { requesterId: playerId })
+      await getGameDetail(roomCode)
+    } catch (error) {
+      throw error
     }
-    return request.delete(`/game/${roomCode}/score/${recordId}`, { headers })
   }
 
   // 更新玩家昵称
   const updatePlayerNickname = async (roomCode, playerId, newNickname, syncToProfile = false) => {
     try {
-      await gameApi.updatePlayerNickname(roomCode, playerId, newNickname)
+      await gameApi.updatePlayerNickname(roomCode, playerId, { nickname: newNickname })
 
       // 如果需要同步到个人资料
       if (syncToProfile && !userStore.isGuest) {
@@ -182,29 +192,39 @@ export const useGameStore = defineStore('game',() => {
   }
 
   // 获取我的游戏列表
-  const loadMyGames = async () => {
+  const loadMyGames = async (filter = {}) => {
     loading.value = true
     try {
       const playerId = getPlayerId()
       const playerType = userStore.isGuest ? 'guest' : 'user'
 
-      console.log('Loading games for:', { playerId, playerType }) // 调试日志
-
       if (!playerId) {
-        console.error('PlayerId is null or undefined')
         myGames.value = []
         return
       }
 
       const games = await gameApi.getMyGames({
         playerId,
-        playerType
+        playerType,
+        ...filter
       })
 
       myGames.value = games
     } catch (error) {
-      console.error('Load games error:', error)
       throw new Error(error.response?.data?.message || '加载游戏列表失败')
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // 编辑游戏信息
+  const editGame = async (roomCode, data) => {
+    loading.value = true
+    try {
+      await gameApi.editGame(roomCode, data)
+      await getGameDetail(roomCode)
+    } catch (error) {
+      throw new Error(error.response?.data?.message || '编辑游戏失败')
     } finally {
       loading.value = false
     }
@@ -227,8 +247,13 @@ export const useGameStore = defineStore('game',() => {
     }
   }
 
-  // 获取统计数据
-  const getStats = async () => {
+  // 获取统计数据（带缓存）
+  const getStats = async (force = false) => {
+    const now = Date.now()
+    if (!force && statsCache.value.data && (now - statsCache.value.ts) < CACHE_TTL) {
+      return statsCache.value.data
+    }
+
     loading.value = true
     try {
       const playerId = getPlayerId()
@@ -239,11 +264,48 @@ export const useGameStore = defineStore('game',() => {
         playerType
       })
 
+      statsCache.value = { data: stats, ts: now }
       return stats
     } catch (error) {
       throw new Error(error.response?.data?.message || '获取统计数据失败')
     } finally {
       loading.value = false
+    }
+  }
+
+  // 获取对手统计（带缓存）
+  const getOpponentStats = async (force = false) => {
+    const now = Date.now()
+    if (!force && opponentsCache.value.data && (now - opponentsCache.value.ts) < CACHE_TTL) {
+      return opponentsCache.value.data
+    }
+
+    try {
+      const playerId = getPlayerId()
+      const playerType = userStore.isGuest ? 'guest' : 'user'
+      const data = await gameApi.getOpponentStats({ playerId, playerType })
+      opponentsCache.value = { data, ts: now }
+      return data
+    } catch (error) {
+      throw new Error(error.response?.data?.message || '获取对手统计失败')
+    }
+  }
+
+  // 获取排行榜（带缓存）
+  const getLeaderboard = async (force = false) => {
+    const now = Date.now()
+    if (!force && leaderboardCache.value.data && (now - leaderboardCache.value.ts) < CACHE_TTL) {
+      return leaderboardCache.value.data
+    }
+
+    try {
+      const playerId = getPlayerId()
+      const playerType = userStore.isGuest ? 'guest' : 'user'
+      const data = await gameApi.getLeaderboard({ playerId, playerType })
+      leaderboardCache.value = { data, ts: now }
+      return data
+    } catch (error) {
+      throw new Error(error.response?.data?.message || '获取排行榜失败')
     }
   }
 
@@ -257,10 +319,13 @@ export const useGameStore = defineStore('game',() => {
     addScore,
     undoScore,
     updatePlayerNickname,
+    editGame,
     endGame,
     loadMyGames,
     deleteGame,
     getStats,
+    getOpponentStats,
+    getLeaderboard,
     getPlayerId,
     getPlayerNickname
   }

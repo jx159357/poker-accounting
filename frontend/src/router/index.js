@@ -57,13 +57,6 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
   const userStore = useUserStore()
 
-  console.log('Route guard:', {
-    to: to.path,
-    isGuest: userStore.isGuest,
-    hasToken: !!userStore.token,
-    username: userStore.username
-  })
-
   // 如果访问登录页或注册页，直接放行
   if (to.path === '/login' || to.path === '/register') {
     next()
@@ -72,8 +65,7 @@ router.beforeEach((to, from, next) => {
 
   // 如果没有 token 且不是游客，跳转到登录页
   if (!userStore.token && !userStore.isGuest) {
-    console.log('No auth, redirecting to login')
-    next('/login')
+    next({ path: '/login', query: { redirect: to.fullPath } })
     return
   }
 

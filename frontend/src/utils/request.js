@@ -2,7 +2,7 @@ import axios from 'axios'
 import { showToast } from 'vant'
 
 const request = axios.create({
-  baseURL: 'http://localhost:3000',
+  baseURL: '/api',
   timeout: 10000
 })
 
@@ -27,6 +27,13 @@ request.interceptors.response.use(
     return response.data
   },
   error => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('token')
+      localStorage.removeItem('username')
+      localStorage.setItem('isGuest', 'false')
+      window.location.href = '/login'
+      return Promise.reject(error)
+    }
     const message = error.response?.data?.message || '请求失败'
     showToast(message)
     return Promise.reject(error)

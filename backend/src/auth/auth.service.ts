@@ -188,6 +188,24 @@ export class AuthService {
     };
   }
 
+  // 修改密码
+  async changePassword(userId: number, oldPassword: string, newPassword: string) {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('用户不存在');
+    }
+
+    const isOldValid = await bcrypt.compare(oldPassword, user.password);
+    if (!isOldValid) {
+      throw new UnauthorizedException('旧密码不正确');
+    }
+
+    user.password = await bcrypt.hash(newPassword, 10);
+    await this.userRepository.save(user);
+
+    return { message: '密码修改成功' };
+  }
+
   // 合并游客数据到已有用户
   async mergeGuestData(userId: number, guestId: string) {
     // 查找游客的所有游戏玩家记录

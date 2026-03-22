@@ -13,6 +13,23 @@ export default defineConfig({
   plugins: [vue(), tailwindcss()],
   server: {
     host: '0.0.0.0',
-    port: 9527
+    port: 9527,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+      }
+    }
+  },
+  build: {
+    outDir: 'dist',
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vant: ['vant'],
+          vue: ['vue', 'vue-router', 'pinia'],
+        }
+      }
+    }
   }
 })

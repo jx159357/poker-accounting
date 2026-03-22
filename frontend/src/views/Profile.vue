@@ -1,35 +1,62 @@
 <template>
-  <div class="h-screen flex flex-col bg-gray-50 overflow-hidden">
-    <van-nav-bar title="个人资料" left-arrow fixed placeholder @click-left="router.back()" />
+  <div class="h-full flex flex-col bg-gray-50 overflow-hidden">
+    <van-nav-bar title="个人资料" left-arrow @click-left="router.back()" />
 
     <van-loading v-if="loading" class="flex-1 flex items-center justify-center" />
 
-    <div v-else class="flex-1 overflow-y-auto">
-      <div class="p-4 space-y-4">
-        <!-- 用户信息卡片 -->
-        <div class="bg-white rounded-lg p-4 shadow-sm">
-          <div class="flex items-center space-x-4">
+    <div v-else class="flex-1 flex flex-col overflow-hidden min-h-0">
+      <!-- 固定区域: 头部 + 统计 -->
+      <div class="flex-shrink-0">
+        <!-- 用户信息卡片 - 带绿色渐变头部 -->
+        <div class="profile-header">
+          <div class="profile-header-bg"></div>
+          <div class="profile-avatar-area">
             <div
-              class="w-16 h-16 rounded-full flex items-center justify-center text-white text-2xl font-bold flex-shrink-0"
+              class="profile-avatar"
               :style="{ backgroundColor: getAvatarColor(profile.nickname || profile.username) }"
             >
               {{ getInitial(profile.nickname || profile.username) }}
             </div>
-            <div class="flex-1 min-w-0">
-              <div class="text-lg font-bold truncate">{{ profile.nickname || profile.username }}</div>
-              <div class="text-sm text-gray-500 mt-1">
-                {{ userStore.isGuest ? '游客' : '注册用户' }}
-              </div>
-              <div class="text-xs text-gray-400 mt-1 truncate">
-                ID: {{ userStore.isGuest ? guestId : profile.username }}
-              </div>
+            <div class="profile-name">{{ profile.nickname || profile.username }}</div>
+            <div class="profile-role">
+              {{ userStore.isGuest ? '游客' : '注册用户' }}
+              <span class="profile-id">· ID: {{ userStore.isGuest ? guestId : profile.username }}</span>
             </div>
           </div>
         </div>
 
+        <!-- 统计数据 - 4列单行紧凑 -->
+        <div v-if="stats" class="profile-stats-bar">
+          <div class="profile-stat-item">
+            <div class="profile-stat-value profile-stat-blue">{{ stats.totalGames }}</div>
+            <div class="profile-stat-label">总场次</div>
+          </div>
+          <div class="profile-stat-item">
+            <div class="profile-stat-value profile-stat-green">{{ stats.winRate }}%</div>
+            <div class="profile-stat-label">胜率</div>
+          </div>
+          <div class="profile-stat-item">
+            <div class="profile-stat-value profile-stat-purple">{{ stats.totalWins }}</div>
+            <div class="profile-stat-label">胜场</div>
+          </div>
+          <div class="profile-stat-item">
+            <div
+              class="profile-stat-value"
+              :class="stats.totalScore >= 0 ? 'profile-stat-green' : 'profile-stat-red'"
+            >
+              {{ stats.totalScore >= 0 ? '+' : '' }}{{ stats.totalScore }}
+            </div>
+            <div class="profile-stat-label">总积分</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 可滚动区域 -->
+      <div class="flex-1 overflow-y-auto min-h-0">
+        <div class="profile-body">
         <!-- 编辑昵称 -->
-        <div class="bg-white rounded-lg shadow-sm">
-          <van-cell-group>
+        <div class="profile-card">
+          <van-cell-group :border="false">
             <van-field
               v-model="editForm.nickname"
               label="昵称"
@@ -41,6 +68,7 @@
                   v-if="!isEditing"
                   size="small"
                   type="primary"
+                  round
                   @click="startEdit"
                 >
                   修改
@@ -48,10 +76,11 @@
               </template>
             </van-field>
           </van-cell-group>
-          <div v-if="isEditing" class="p-4 flex space-x-2">
+          <div v-if="isEditing" class="edit-actions">
             <van-button
               block
               type="primary"
+              round
               @click="handleSaveNickname"
               :loading="saving"
             >
@@ -59,6 +88,7 @@
             </van-button>
             <van-button
               block
+              round
               @click="cancelEdit"
             >
               取消
@@ -67,58 +97,91 @@
         </div>
 
         <!-- 游客转注册 -->
-        <div v-if="userStore.isGuest" class="bg-white rounded-lg p-4 shadow-sm">
-          <div class="text-center">
-            <div class="text-sm text-gray-600 mb-3">
-              注册账号可以保存你的游戏数据
+        <div v-if="userStore.isGuest" class="profile-card guest-card">
+          <div class="guest-hint">
+            注册账号可以保存你的游戏数据
+          </div>
+          <van-button
+            type="primary"
+            block
+            round
+            @click="router.push('/register')"
+          >
+            注册账号
+          </van-button>
+        </div>
+
+        <!-- 修改密码 (注册用户专属) -->
+        <div v-if="!userStore.isGuest" class="profile-card">
+          <van-cell-group :border="false">
+            <van-cell title="修改密码" is-link @click="showPasswordForm = !showPasswordForm" />
+          </van-cell-group>
+          <div v-if="showPasswordForm" class="password-form">
+            <van-field
+              v-model="passwordForm.oldPassword"
+              type="password"
+              label="旧密码"
+              placeholder="请输入旧密码"
+            />
+            <van-field
+              v-model="passwordForm.newPassword"
+              type="password"
+              label="新密码"
+              placeholder="请输入新密码 (至少6位)"
+            />
+            <van-field
+              v-model="passwordForm.confirmPassword"
+              type="password"
+              label="确认密码"
+              placeholder="请再次输入新密码"
+            />
+            <div class="edit-actions">
+              <van-button
+                block
+                type="primary"
+                round
+                @click="handleChangePassword"
+                :loading="savingPassword"
+              >
+                确认修改
+              </van-button>
             </div>
-            <van-button
-              type="primary"
-              block
-              @click="router.push('/register')"
-            >
-              注册账号
-            </van-button>
           </div>
         </div>
 
-        <!-- 统计数据 -->
-        <div v-if="stats" class="bg-white rounded-lg p-4 shadow-sm">
-          <h3 class="text-lg font-bold mb-3">我的数据</h3>
-          <div class="grid grid-cols-2 gap-4">
-            <div class="text-center">
-              <div class="text-2xl font-bold text-blue-600">{{ stats.totalGames }}</div>
-              <div class="text-sm text-gray-500 mt-1">总场次</div>
-            </div>
-            <div class="text-center">
-              <div class="text-2xl font-bold text-green-600">{{ stats.winRate }}%</div>
-              <div class="text-sm text-gray-500 mt-1">胜率</div>
-            </div>
-            <div class="text-center">
-              <div class="text-2xl font-bold text-purple-600">{{ stats.totalWins }}</div>
-              <div class="text-sm text-gray-500 mt-1">胜场</div>
-            </div>
-            <div class="text-center">
-              <div
-                :class="stats.totalScore >= 0 ? 'text-green-600' : 'text-red-600'"
-                class="text-2xl font-bold"
-              >
-                {{ stats.totalScore >= 0 ? '+' : '' }}{{ stats.totalScore }}
-              </div>
-              <div class="text-sm text-gray-500 mt-1">总积分</div>
+        <!-- 我的成就 (注册用户专属) -->
+        <div v-if="!userStore.isGuest && achievements.length > 0" class="profile-card">
+          <van-cell-group :border="false">
+            <van-cell
+              :title="`我的成就 (${achievements.filter(a => a.unlocked).length}/${achievements.length})`"
+              is-link
+              :arrow-direction="showAchievements ? 'up' : 'down'"
+              @click="showAchievements = !showAchievements"
+            />
+          </van-cell-group>
+          <div v-if="showAchievements" class="achievement-grid">
+            <div
+              v-for="ach in achievements"
+              :key="ach.code"
+              class="achievement-item"
+              :class="{ 'achievement-locked': !ach.unlocked }"
+            >
+              <div class="achievement-icon">{{ ach.icon }}</div>
+              <div class="achievement-name">{{ ach.name }}</div>
             </div>
           </div>
         </div>
 
         <!-- 退出登录 -->
-        <div v-if="!userStore.isGuest" class="bg-white rounded-lg shadow-sm">
-          <van-cell-group>
+        <div v-if="!userStore.isGuest" class="profile-card logout-card">
+          <van-cell-group :border="false">
             <van-cell
               title="退出登录"
               is-link
               @click="handleLogout"
             />
           </van-cell-group>
+        </div>
         </div>
       </div>
     </div>
@@ -139,6 +202,8 @@ const gameStore = useGameStore();
 
 const loading = ref(false);
 const saving = ref(false);
+const savingPassword = ref(false);
+const showPasswordForm = ref(false);
 const isEditing = ref(false);
 const profile = ref({
   username: '',
@@ -147,7 +212,14 @@ const profile = ref({
 const editForm = ref({
   nickname: '',
 });
+const passwordForm = ref({
+  oldPassword: '',
+  newPassword: '',
+  confirmPassword: '',
+});
 const stats = ref(null);
+const achievements = ref([]);
+const showAchievements = ref(false);
 
 const guestId = computed(() => {
   return localStorage.getItem('guestId') || '';
@@ -162,8 +234,8 @@ const getInitial = (name) => {
 
 const getAvatarColor = (name) => {
   const colors = [
-    '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8',
-    '#F7DC6F', '#BB8FCE', '#85C1E2', '#F8B739', '#52B788'
+    '#16A34A', '#10B981', '#0EA5E9', '#8B5CF6', '#EC4899',
+    '#F59E0B', '#EF4444', '#06B6D4', '#6366F1', '#14B8A6'
   ];
 
   if (!name || typeof name !== 'string') {
@@ -181,7 +253,6 @@ const loadProfile = async () => {
   loading.value = true;
   try {
     if (userStore.isGuest) {
-      // 游客模式
       const nickname = localStorage.getItem('guestNickname') || '游客';
       profile.value = {
         username: guestId.value,
@@ -189,16 +260,21 @@ const loadProfile = async () => {
       };
       editForm.value.nickname = nickname;
     } else {
-      // 注册用户
       const data = await authApi.getProfile();
       profile.value = data;
       editForm.value.nickname = data.nickname || data.username;
     }
 
-    // 加载统计数据
-    stats.value = await gameStore.getStats();
+    stats.value = await gameStore.getStats(true);
+
+    if (!userStore.isGuest) {
+      try {
+        achievements.value = await authApi.getAchievements() || [];
+      } catch {
+        // achievements API may not be ready yet
+      }
+    }
   } catch (error) {
-    console.error('Load profile error:', error);
     showToast(error.message || '加载失败');
   } finally {
     loading.value = false;
@@ -219,12 +295,10 @@ const handleSaveNickname = async () => {
   saving.value = true;
   try {
     if (userStore.isGuest) {
-      // 游客模式 - 保存到 localStorage
       localStorage.setItem('guestNickname', editForm.value.nickname);
       profile.value.nickname = editForm.value.nickname;
       showToast('昵称已更新');
     } else {
-      // 注册用户 - 保存到服务器
       await authApi.updateProfile({
         nickname: editForm.value.nickname,
       });
@@ -243,6 +317,36 @@ const handleSaveNickname = async () => {
 const cancelEdit = () => {
   editForm.value.nickname = profile.value.nickname || profile.value.username;
   isEditing.value = false;
+};
+
+const handleChangePassword = async () => {
+  if (!passwordForm.value.oldPassword || !passwordForm.value.newPassword) {
+    showToast('请填写完整');
+    return;
+  }
+  if (passwordForm.value.newPassword.length < 6) {
+    showToast('新密码至少6位');
+    return;
+  }
+  if (passwordForm.value.newPassword !== passwordForm.value.confirmPassword) {
+    showToast('两次密码不一致');
+    return;
+  }
+
+  savingPassword.value = true;
+  try {
+    await authApi.changePassword({
+      oldPassword: passwordForm.value.oldPassword,
+      newPassword: passwordForm.value.newPassword,
+    });
+    showToast('密码修改成功');
+    showPasswordForm.value = false;
+    passwordForm.value = { oldPassword: '', newPassword: '', confirmPassword: '' };
+  } catch (error) {
+    showToast(error.response?.data?.message || error.message || '修改失败');
+  } finally {
+    savingPassword.value = false;
+  }
 };
 
 const handleLogout = async () => {
@@ -264,3 +368,185 @@ onMounted(() => {
   loadProfile();
 });
 </script>
+
+<style scoped>
+.profile-header {
+  position: relative;
+  padding-bottom: 10px;
+}
+
+.profile-header-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 80px;
+  background: linear-gradient(135deg, var(--color-primary, #16A34A) 0%, var(--color-primary-dark, #15803D) 60%, #166534 100%);
+}
+
+.profile-avatar-area {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 18px;
+}
+
+.profile-avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 20px;
+  font-weight: 700;
+  border: 2px solid #fff;
+  box-shadow: var(--shadow-md);
+}
+
+.profile-name {
+  font-size: var(--font-size-lg, 16px);
+  font-weight: 700;
+  color: var(--color-text-primary, #1A1A1A);
+  margin-top: 6px;
+}
+
+.profile-role {
+  font-size: var(--font-size-sm, 13px);
+  color: var(--color-text-secondary, #6B7280);
+  margin-top: 2px;
+}
+
+.profile-id {
+  font-size: var(--font-size-xs, 12px);
+  color: var(--color-text-placeholder, #9CA3AF);
+}
+
+/* 统计条 - 4列单行 */
+.profile-stats-bar {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0;
+  background: var(--color-bg-white, #fff);
+  margin: 0 16px;
+  border-radius: var(--radius-md, 12px);
+  box-shadow: var(--shadow-sm);
+  padding: 10px 0;
+}
+
+.profile-stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.profile-stat-value {
+  font-size: var(--font-size-lg, 16px);
+  font-weight: 700;
+}
+
+.profile-stat-blue { color: #3B82F6; }
+.profile-stat-green { color: var(--color-success, #16A34A); }
+.profile-stat-purple { color: #8B5CF6; }
+.profile-stat-red { color: var(--color-danger, #EF4444); }
+
+.profile-stat-label {
+  font-size: var(--font-size-xs, 12px);
+  color: var(--color-text-placeholder, #9CA3AF);
+  margin-top: 2px;
+}
+
+.profile-body {
+  padding: 12px 16px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.profile-card {
+  background: var(--color-bg-white, #fff);
+  border-radius: var(--radius-md, 12px);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.card-title {
+  font-size: var(--font-size-lg, 16px);
+  font-weight: 700;
+  color: var(--color-text-primary, #1A1A1A);
+  margin: 0;
+  padding: 18px 18px 14px;
+}
+
+.edit-actions {
+  padding: 12px 16px 16px;
+  display: flex;
+  gap: 10px;
+}
+
+.guest-card {
+  padding: 20px;
+  text-align: center;
+}
+
+.guest-hint {
+  font-size: var(--font-size-md, 14px);
+  color: var(--color-text-secondary, #6B7280);
+  margin-bottom: 14px;
+}
+
+.logout-card {
+  margin-top: 4px;
+}
+
+.profile-card :deep(.van-cell-group) {
+  background: transparent;
+}
+
+.profile-card :deep(.van-cell) {
+  background: transparent;
+}
+
+.profile-card :deep(.van-cell::after) {
+  border-bottom: none;
+}
+
+.password-form {
+  padding-bottom: 4px;
+}
+
+.achievement-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  padding: 0 16px 18px;
+}
+
+.achievement-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 4px;
+  background: var(--color-bg-secondary, #F9FAFB);
+  border-radius: 10px;
+  text-align: center;
+}
+
+.achievement-locked {
+  opacity: 0.35;
+  filter: grayscale(1);
+}
+
+.achievement-icon {
+  font-size: 28px;
+  margin-bottom: 6px;
+}
+
+.achievement-name {
+  font-size: var(--font-size-xs, 12px);
+  color: var(--color-text-tertiary, #374151);
+  font-weight: 500;
+}
+</style>

@@ -6,145 +6,135 @@
       left-arrow
       fixed
       placeholder
-      @click-left="router.back()"
+      @click-left="router.push('/home')"
     >
       <template #right>
-        <van-button
-          v-if="game?.status === 'active'"
-          type="danger"
-          size="small"
-          @click="handleEndGame"
-        >
-          结束
-        </van-button>
+        <div class="nav-right-actions">
+          <van-icon
+            v-if="isCreator && !userStore.isGuest && game?.status === 'active'"
+            name="edit"
+            size="20"
+            class="nav-action-icon"
+            @click="showEditGameDialog = true"
+          />
+          <van-button
+            v-if="game?.status === 'active'"
+            type="danger"
+            size="small"
+            round
+            @click="handleEndGame"
+          >
+            结束
+          </van-button>
+        </div>
       </template>
     </van-nav-bar>
 
     <van-loading v-if="gameStore.loading && !game" class="flex-1 flex items-center justify-center" />
 
     <div v-else-if="game" class="flex-1 flex flex-col overflow-hidden">
-      <!-- 房间信息 - 固定高度 -->
-      <div class="bg-gradient-to-r from-blue-500 to-purple-600 text-white p-3 flex-shrink-0">
+      <!-- 房间信息 - 绿色渐变 -->
+      <div class="room-header">
         <div class="flex items-center justify-between">
           <div>
-            <div class="text-xs opacity-90">房间号</div>
-            <div class="text-xl font-bold mt-0.5">{{ game.roomCode }}</div>
+            <div class="room-label">房间号</div>
+            <div class="room-code">{{ game.roomCode }}</div>
           </div>
-          <van-button
-            plain
-            type="primary"
-            size="small"
-            icon="share-o"
-            @click="handleShare"
-          >
-            分享
-          </van-button>
+          <button class="share-btn" @click="handleShare">
+            <van-icon name="share-o" size="16" />
+            <span>分享</span>
+          </button>
         </div>
       </div>
 
-      <!-- 主内容区 - 可滚动 -->
-      <div class="flex-1 overflow-y-auto">
-        <div class="p-3">
-          <!-- 玩家列表 -->
-          <div class="mb-3">
-            <div class="flex items-center justify-between mb-2">
-              <span class="text-sm font-bold">玩家 ({{ game.players?.length || 0 }})</span>
-            </div>
+      <!-- 玩家列表 - 固定区域 -->
+      <div class="flex-shrink-0 p-3 pb-0">
+        <div class="mb-3">
+          <div class="flex items-center justify-between mb-2">
+            <span class="section-label">玩家 ({{ game.players?.length || 0 }})</span>
+          </div>
 
-            <van-empty v-if="!game.players || game.players.length === 0" description="暂无玩家" />
+          <van-empty v-if="!game.players || game.players.length === 0" description="暂无玩家" />
 
-            <div v-else class="grid grid-cols-3 gap-2">
-              <div
-                v-for="player in sortedPlayers"
-                :key="player.id"
-                class="bg-white rounded-lg p-2 shadow-sm active:bg-gray-50 transition"
-                @click="game.status === 'active' && handlePlayerClick(player)"
-              >
-                <div class="flex flex-col items-center">
-                  <!-- 头像 -->
-                  <div
-                    class="w-10 h-10 rounded-full flex items-center justify-center text-white text-lg font-bold"
-                    :style="{ backgroundColor: getAvatarColor(player.name) }"
-                  >
-                    {{ getPlayerInitial(player.name) }}
-                  </div>
-
-                  <div class="mt-1 text-center w-full">
-                    <div class="text-xs font-semibold text-gray-800 truncate">
-                      {{ player.name || '未知' }}
-                    </div>
-                    <div
-                      :class="Number(player.balance) >= 0 ? 'text-green-600' : 'text-red-600'"
-                      class="text-sm font-bold"
-                    >
-                      {{ Number(player.balance) >= 0 ? '+' : '' }}{{ player.balance }}
-                    </div>
-                  </div>
-
-                  <!-- 修改昵称按钮 -->
-                  <van-button
-                    v-if="isMyPlayer(player)"
-                    size="mini"
-                    type="primary"
-                    plain
-                    class="mt-1 text-xs"
-                    @click.stop="handleEditNickname(player)"
-                  >
-                    改名
-                  </van-button>
+          <div v-else class="player-grid">
+            <div
+              v-for="player in sortedPlayers"
+              :key="player.id"
+              class="player-card"
+              @click="game.status === 'active' && handlePlayerClick(player)"
+            >
+              <div class="player-content">
+                <!-- 头像 -->
+                <div
+                  class="player-avatar"
+                  :style="{ backgroundColor: getAvatarColor(player.name) }"
+                >
+                  {{ getPlayerInitial(player.name) }}
                 </div>
+
+                <div class="player-info">
+                  <div class="player-name">
+                    {{ player.name || '未知' }}
+                  </div>
+                  <div
+                    class="player-score"
+                    :class="Number(player.balance) >= 0 ? 'score-positive' : 'score-negative'"
+                  >
+                    {{ Number(player.balance) >= 0 ? '+' : '' }}{{ player.balance }}
+                  </div>
+                </div>
+
+                <!-- 修改昵称链接 -->
+                <span
+                  v-if="isMyPlayer(player)"
+                  class="rename-link"
+                  @click.stop="handleEditNickname(player)"
+                >
+                  改名
+                </span>
               </div>
             </div>
           </div>
+        </div>
+      </div>
 
-          <!-- 记录列表 -->
-          <div>
-            <div class="flex items-center justify-between mb-2">
-              <span class="text-sm font-bold">记录 ({{ game.gameRecords?.length || 0 }})</span>
-              <van-button
-                v-if="game.gameRecords && game.gameRecords.length > 5"
-                size="mini"
-                type="primary"
-                plain
-                @click="showAllRecords = !showAllRecords"
-              >
-                {{ showAllRecords ? '收起' : '展开全部' }}
-              </van-button>
-            </div>
+      <!-- 记录区域 -->
+      <div class="records-section">
+        <div class="records-header">
+          <span class="section-label">记录 ({{ game.gameRecords?.length || 0 }})</span>
+        </div>
 
-            <van-empty v-if="!game.gameRecords || game.gameRecords.length === 0" description="暂无记录" />
+        <van-empty v-if="!game.gameRecords || game.gameRecords.length === 0" description="暂无记录" />
 
-            <div v-else class="space-y-2">
+        <div v-else class="records-scroll">
+          <div class="record-list">
+            <template v-for="(group, gIndex) in groupedRecords" :key="gIndex">
+              <div v-if="gIndex > 0" class="record-group-divider">
+                <span class="divider-time">{{ formatGroupGap(group[0].createdAt, groupedRecords[gIndex - 1]) }}</span>
+              </div>
               <div
-                v-for="record in displayRecords"
+                v-for="record in group"
                 :key="record.id"
-                class="bg-white rounded-lg p-2 shadow-sm text-xs"
+                class="record-item"
               >
-                <div class="flex items-center justify-between">
-                  <div class="flex-1">
-                    <span class="font-medium">{{ getPlayerName(record.fromPlayer?.id) }}</span>
-                    <span class="text-gray-500"> → </span>
-                    <span class="font-medium">{{ getPlayerName(record.toPlayer?.id) }}</span>
-                    <span class="text-green-600 font-bold ml-1">+{{ record.amount }}</span>
+                <div class="record-main">
+                  <div class="record-flow">
+                    <span class="record-player">{{ getPlayerName(record.fromPlayer?.id) }}</span>
+                    <span class="record-arrow">
+                      <van-icon name="arrow" size="12" color="#16A34A" />
+                    </span>
+                    <span class="record-player">{{ getPlayerName(record.toPlayer?.id) }}</span>
+                    <span class="record-amount">+{{ record.amount }}</span>
                   </div>
-                  <div class="flex items-center space-x-2">
-                    <span class="text-gray-400">{{ formatDateTime(record.createdAt) }}</span>
-                    <van-button
-                      v-if="game.status === 'active' && canUndoRecord(record)"
-                      size="mini"
-                      type="danger"
-                      plain
-                      @click="handleUndoScore(record.id)"
-                    >
-                      撤销
-                    </van-button>
+                  <div class="record-actions">
+                    <span class="record-time">{{ formatDateTime(record.createdAt) }}</span>
                   </div>
                 </div>
-                <div v-if="record.note" class="text-gray-500 mt-1">
-                  备注: {{ record.note }}
+                <div v-if="record.note" class="record-note">
+                  {{ record.note }}
                 </div>
               </div>
-            </div>
+            </template>
           </div>
         </div>
       </div>
@@ -200,15 +190,131 @@
         </div>
       </div>
     </van-dialog>
+
+    <!-- 编辑游戏对话框 -->
+    <van-dialog
+      v-model:show="showEditGameDialog"
+      title="编辑房间"
+      show-cancel-button
+      @confirm="handleEditGame"
+    >
+      <div class="p-4">
+        <van-field
+          v-model="editGameForm.name"
+          label="房间名称"
+          placeholder="请输入房间名称"
+        />
+        <van-field
+          v-model="editGameForm.gameType"
+          label="游戏类型"
+          placeholder="点击选择类型"
+          readonly
+          is-link
+          @click="showEditTypeSheet = true"
+        />
+        <van-field
+          v-if="editGameForm.gameType === '自定义'"
+          v-model="editGameForm.customType"
+          label="自定义类型"
+          placeholder="请输入游戏类型名称"
+          required
+        />
+        <van-button
+          v-if="isCreator && !userStore.isGuest"
+          block
+          type="danger"
+          plain
+          round
+          class="mt-4"
+          @click="handleDeleteGame"
+        >
+          删除游戏
+        </van-button>
+      </div>
+    </van-dialog>
+
+    <!-- 编辑游戏类型选择 -->
+    <van-action-sheet
+      v-model:show="showEditTypeSheet"
+      :actions="editTypeActions"
+      cancel-text="取消"
+      @select="onEditTypeSelect"
+    />
+
+    <!-- 结算弹窗 -->
+    <van-popup
+      v-model:show="showSettlement"
+      round
+      closeable
+      position="bottom"
+      :style="{ maxHeight: '70%' }"
+      @closed="onSettlementClosed"
+    >
+      <div class="settlement-popup">
+        <h3 class="settlement-title">游戏结算</h3>
+        <div class="settlement-list">
+          <div
+            v-for="(player, index) in settlementPlayers"
+            :key="player.id"
+            class="settlement-item"
+          >
+            <div class="settlement-rank">{{ index + 1 }}</div>
+            <div
+              class="settlement-avatar"
+              :style="{ backgroundColor: getAvatarColor(player.name) }"
+            >
+              {{ getPlayerInitial(player.name) }}
+            </div>
+            <div class="settlement-name">{{ player.name }}</div>
+            <div
+              class="settlement-score"
+              :class="Number(player.balance) >= 0 ? 'score-positive' : 'score-negative'"
+            >
+              {{ Number(player.balance) >= 0 ? '+' : '' }}{{ player.balance }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </van-popup>
+
+    <!-- 游客注册提示 -->
+    <RegisterPrompt v-model:visible="showRegisterPrompt" source="game-end" />
+
+    <!-- 非玩家加入提示弹窗 -->
+    <van-dialog
+      v-model:show="showJoinPrompt"
+      :title="roomEnded ? '房间已结束' : '加入房间'"
+      :show-cancel-button="true"
+      :confirm-button-text="roomEnded ? '查看记录' : '加入房间'"
+      cancel-button-text="返回首页"
+      @confirm="handleJoinRoom"
+      @cancel="router.push('/home')"
+    >
+      <div class="p-4 text-center">
+        <template v-if="roomEnded">
+          <p class="text-gray-600">该房间的游戏已结束</p>
+          <p class="text-sm text-gray-400 mt-2">你可以查看游戏记录</p>
+        </template>
+        <template v-else>
+          <p class="text-gray-600">{{ game?.name || '游戏房间' }}</p>
+          <p class="text-sm text-gray-400 mt-2">
+            类型: {{ game?.gameType || '其他' }} · 玩家: {{ game?.players?.length || 0 }}人
+          </p>
+          <p class="text-sm text-gray-500 mt-2">是否加入该房间?</p>
+        </template>
+      </div>
+    </van-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useGameStore } from '../stores/game';
 import { useUserStore } from '../stores/user';
 import { showToast, showConfirmDialog } from 'vant';
+import RegisterPrompt from '../components/RegisterPrompt.vue';
+import { getSelectableTypes } from '../config/gameTypes';
 
 const route = useRoute();
 const router = useRouter();
@@ -218,7 +324,6 @@ const userStore = useUserStore();
 const roomCode = route.params.roomCode;
 const showScoreDialog = ref(false);
 const showEditNicknameDialog = ref(false);
-const showAllRecords = ref(false);
 const selectedPlayer = ref(null);
 const editingPlayer = ref(null);
 const scoreForm = ref({
@@ -229,8 +334,33 @@ const editNicknameForm = ref({
   nickname: '',
   syncToProfile: false
 });
+const showEditGameDialog = ref(false);
+const editGameForm = ref({ name: '', gameType: '', customType: '' });
+const showEditTypeSheet = ref(false);
+const selectableTypes = getSelectableTypes();
+const editTypeActions = selectableTypes.map(t => ({ name: t }));
+const showSettlement = ref(false);
+const showRegisterPrompt = ref(false);
+const showJoinPrompt = ref(false);
+const roomEnded = ref(false);
+let previousStatus = null;
 
 let refreshInterval = null;
+
+// 页面可见性变化：暂停/恢复轮询
+const handleVisibilityChange = () => {
+  if (document.hidden) {
+    if (refreshInterval) {
+      clearInterval(refreshInterval);
+      refreshInterval = null;
+    }
+  } else {
+    loadGame();
+    refreshInterval = setInterval(() => {
+      loadGame();
+    }, 5000);
+  }
+};
 
 const game = computed(() => gameStore.currentGame);
 
@@ -239,17 +369,54 @@ const sortedPlayers = computed(() => {
   return [...game.value.players].sort((a, b) => Number(b.balance) - Number(a.balance));
 });
 
-const displayRecords = computed(() => {
-  if (!game.value?.gameRecords) return [];
-  if (showAllRecords.value) return game.value.gameRecords;
-  return game.value.gameRecords.slice(0, 5); // 默认只显示最近5条
+// 按时间间隔分组记录（2分钟内的记录归为一组）
+const groupedRecords = computed(() => {
+  const records = game.value?.gameRecords;
+  if (!records?.length) return [];
+
+  const GROUP_GAP = 2 * 60 * 1000; // 2分钟
+  const groups = [[records[0]]];
+
+  for (let i = 1; i < records.length; i++) {
+    const prevTime = new Date(records[i - 1].createdAt).getTime();
+    const currTime = new Date(records[i].createdAt).getTime();
+    if (Math.abs(currTime - prevTime) > GROUP_GAP) {
+      groups.push([records[i]]);
+    } else {
+      groups[groups.length - 1].push(records[i]);
+    }
+  }
+  return groups;
 });
+
+const formatGroupGap = (currentTime, prevGroup) => {
+  const prev = new Date(prevGroup[prevGroup.length - 1].createdAt).getTime();
+  const curr = new Date(currentTime).getTime();
+  const gap = Math.abs(curr - prev);
+  const minutes = Math.round(gap / (1000 * 60));
+  if (minutes < 60) return `${minutes} 分钟后`;
+  const hours = Math.round(minutes / 60);
+  return `${hours} 小时后`;
+};
 
 const currentPlayerId = computed(() => {
   return gameStore.getPlayerId();
 });
 
-// 获取玩家昵称首字母
+const isCreator = computed(() => {
+  if (!game.value) return false;
+  return game.value.creatorId === currentPlayerId.value;
+});
+
+const isPlayerInGame = computed(() => {
+  return game.value?.players?.some(p => isMyPlayer(p)) ?? false;
+});
+
+const settlementPlayers = computed(() => {
+  if (!game.value?.players) return [];
+  return [...game.value.players].sort((a, b) => Number(b.balance) - Number(a.balance));
+});
+
 const getPlayerInitial = (name) => {
   if (!name || typeof name !== 'string' || name.length === 0) {
     return '?';
@@ -257,11 +424,10 @@ const getPlayerInitial = (name) => {
   return name.charAt(0).toUpperCase();
 };
 
-// 根据昵称生成头像颜色
 const getAvatarColor = (nickname) => {
   const colors = [
-    '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8',
-    '#F7DC6F', '#BB8FCE', '#85C1E2', '#F8B739', '#52B788'
+    '#16A34A', '#10B981', '#0EA5E9', '#8B5CF6', '#EC4899',
+    '#F59E0B', '#EF4444', '#06B6D4', '#6366F1', '#14B8A6'
   ];
 
   if (!nickname || typeof nickname !== 'string') {
@@ -275,7 +441,6 @@ const getAvatarColor = (nickname) => {
   return colors[Math.abs(hash) % colors.length];
 };
 
-// 判断是否是当前玩家
 const isMyPlayer = (player) => {
   if (!player) return false;
   const myPlayerId = currentPlayerId.value;
@@ -283,13 +448,12 @@ const isMyPlayer = (player) => {
 
   if (myPlayerId.startsWith('user_')) {
     const username = myPlayerId.replace('user_', '');
-    return player.userId && player.user?.username === username;
+    return player.user?.username === username;
   } else {
     return player.guestId === myPlayerId;
   }
 };
 
-// 判断是否可以撤销记录
 const canUndoRecord = (record) => {
   if (!record || !record.fromPlayer) return false;
   return isMyPlayer(record.fromPlayer);
@@ -323,25 +487,34 @@ const formatDateTime = (dateString) => {
 };
 
 const handleShare = () => {
-  const text = `房间号: ${game.value.roomCode}\n房间名: ${game.value.name}\n快来加入吧！`;
+  const code = game.value.roomCode;
+  const shareUrl = `${window.location.origin}/room/${code}`;
+  const shareText = `来打牌！房间: ${game.value.name || ''}，房间号: ${code}`;
 
+  // 优先使用 Web Share API
   if (navigator.share) {
     navigator.share({
-      title: '打牌记账',
-      text
-    }).catch(err => {
-      console.log('Share cancelled:', err);
+      title: game.value.name || '打牌记账',
+      text: shareText,
+      url: shareUrl,
+    }).catch(() => {
+      // 用户取消分享，静默处理
     });
-  } else if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(text)
+    return;
+  }
+
+  // 降级: 复制完整 URL
+  const copyText = `${shareText}\n${shareUrl}`;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(copyText)
       .then(() => {
-        showToast('房间信息已复制');
+        showToast('分享信息已复制');
       })
       .catch(() => {
-        fallbackCopyText(text);
+        fallbackCopyText(copyText);
       });
   } else {
-    fallbackCopyText(text);
+    fallbackCopyText(copyText);
   }
 };
 
@@ -355,7 +528,7 @@ const fallbackCopyText = (text) => {
 
   try {
     document.execCommand('copy');
-    showToast('房间信息已复制');
+    showToast('分享信息已复制');
   } catch (err) {
     showToast('复制失败');
   }
@@ -453,6 +626,7 @@ const handleEndGame = async () => {
 
     await gameStore.endGame(roomCode);
     showToast('游戏已结束');
+    showSettlement.value = true;
   } catch (error) {
     if (error !== 'cancel') {
       showToast(error.message || '结束失败');
@@ -460,12 +634,101 @@ const handleEndGame = async () => {
   }
 };
 
+const onEditTypeSelect = (action) => {
+  editGameForm.value.gameType = action.name;
+  editGameForm.value.customType = '';
+  showEditTypeSheet.value = false;
+};
+
+const handleEditGame = async () => {
+  let gameType = editGameForm.value.gameType;
+  if (gameType === '自定义') {
+    gameType = editGameForm.value.customType.trim();
+    if (!gameType) {
+      showToast('请输入自定义游戏类型');
+      return;
+    }
+  }
+
+  try {
+    await gameStore.editGame(roomCode, {
+      name: editGameForm.value.name,
+      gameType: gameType
+    });
+    showToast('修改成功');
+  } catch (error) {
+    showToast(error.message || '修改失败');
+  }
+};
+
+const handleDeleteGame = async () => {
+  showEditGameDialog.value = false;
+  try {
+    await showConfirmDialog({
+      title: '确认删除',
+      message: '删除后数据无法恢复，确定要删除吗？',
+    });
+    await gameStore.deleteGame(roomCode);
+    showToast('已删除');
+    router.push('/home');
+  } catch (error) {
+    if (error !== 'cancel') {
+      showToast(error.message || '删除失败');
+    }
+  }
+};
+
+const onSettlementClosed = () => {
+  if (userStore.isGuest) {
+    showRegisterPrompt.value = true;
+  }
+};
+
+// 监听游戏状态变化，显示结算弹窗
+watch(() => game.value?.status, (newStatus, oldStatus) => {
+  if (oldStatus === 'active' && newStatus === 'ended') {
+    showSettlement.value = true;
+  }
+});
+
+watch(showEditGameDialog, (val) => {
+  if (val && game.value) {
+    const currentType = game.value.gameType || '';
+    const isKnownType = selectableTypes.includes(currentType) && currentType !== '自定义';
+    editGameForm.value.name = game.value.name || '';
+    editGameForm.value.gameType = isKnownType ? currentType : (currentType ? '自定义' : '其他');
+    editGameForm.value.customType = isKnownType ? '' : currentType;
+  }
+});
+
 const loadGame = async () => {
   try {
     await gameStore.getGameDetail(roomCode);
+    // 首次加载时检查是否为房间玩家
+    if (!showJoinPrompt.value && !isPlayerInGame.value && !hasCheckedJoin) {
+      hasCheckedJoin = true;
+      roomEnded.value = game.value.status !== 'active';
+      showJoinPrompt.value = true;
+    }
   } catch (error) {
     showToast(error.message || '加载失败');
     router.push('/home');
+  }
+};
+
+let hasCheckedJoin = false;
+
+const handleJoinRoom = async () => {
+  if (roomEnded.value) {
+    showJoinPrompt.value = false;
+    return;
+  }
+  try {
+    await gameStore.joinGame(roomCode);
+    showToast('已加入房间');
+    showJoinPrompt.value = false;
+  } catch (error) {
+    showToast(error.message || '加入失败');
   }
 };
 
@@ -476,11 +739,326 @@ onMounted(() => {
   refreshInterval = setInterval(() => {
     loadGame();
   }, 5000);
+
+  document.addEventListener('visibilitychange', handleVisibilityChange);
 });
 
 onUnmounted(() => {
   if (refreshInterval) {
     clearInterval(refreshInterval);
   }
+  document.removeEventListener('visibilitychange', handleVisibilityChange);
 });
 </script>
+
+<style scoped>
+.room-header {
+  background: linear-gradient(135deg, var(--color-primary, #16A34A) 0%, var(--color-primary-dark, #15803D) 60%, #166534 100%);
+  color: #fff;
+  padding: 14px 16px;
+  flex-shrink: 0;
+}
+
+.room-label {
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+.room-code {
+  font-size: 22px;
+  font-weight: 700;
+  margin-top: 2px;
+  letter-spacing: 1px;
+}
+
+.share-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 20px;
+  padding: 6px 14px;
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.share-btn:active {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.section-label {
+  font-size: var(--font-size-md, 14px);
+  font-weight: 700;
+  color: var(--color-text-tertiary, #374151);
+}
+
+.player-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.player-card {
+  background: var(--color-bg-white, #fff);
+  border-radius: var(--radius-md, 12px);
+  padding: 10px;
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.player-card:active {
+  transform: scale(0.95);
+}
+
+.player-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.player-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 18px;
+  font-weight: 700;
+  box-shadow: var(--shadow-sm);
+}
+
+.player-info {
+  margin-top: 6px;
+  text-align: center;
+  width: 100%;
+}
+
+.player-name {
+  font-size: var(--font-size-xs, 12px);
+  font-weight: 600;
+  color: var(--color-text-tertiary, #374151);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.player-score {
+  font-size: 15px;
+  font-weight: 700;
+  margin-top: 2px;
+}
+
+.score-positive {
+  color: var(--color-success, #16A34A);
+}
+
+.score-negative {
+  color: var(--color-danger, #EF4444);
+}
+
+.records-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 0 12px 12px;
+}
+
+.records-header {
+  flex-shrink: 0;
+  padding: 4px 0 8px;
+}
+
+.records-scroll {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.record-group-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 0;
+}
+
+.divider-time {
+  font-size: 11px;
+  color: var(--color-text-placeholder, #9CA3AF);
+  background: var(--color-bg, #F0F2F5);
+  padding: 2px 10px;
+  border-radius: 10px;
+}
+
+.record-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.record-item {
+  background: var(--color-bg-white, #fff);
+  border-radius: 10px;
+  padding: 10px 12px;
+  box-shadow: var(--shadow-sm);
+}
+
+.record-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.record-flow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.record-player {
+  font-weight: 600;
+  color: var(--color-text-tertiary, #374151);
+}
+
+.record-arrow {
+  display: flex;
+  align-items: center;
+}
+
+.record-amount {
+  color: var(--color-success, #16A34A);
+  font-weight: 700;
+  margin-left: 2px;
+}
+
+.record-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.record-time {
+  font-size: var(--font-size-xs, 12px);
+  color: var(--color-text-placeholder, #9CA3AF);
+}
+
+.record-note {
+  font-size: var(--font-size-xs, 12px);
+  color: var(--color-text-placeholder, #9CA3AF);
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--color-bg-hover, #F3F4F6);
+}
+
+.nav-right-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.nav-action-icon {
+  color: var(--color-text-tertiary, #374151);
+  cursor: pointer;
+}
+
+.settlement-popup {
+  padding: 24px 20px 32px;
+}
+
+.settlement-title {
+  font-size: var(--font-size-xl, 20px);
+  font-weight: 700;
+  color: var(--color-text-primary, #1A1A1A);
+  text-align: center;
+  margin: 0 0 20px;
+}
+
+.settlement-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.settlement-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: var(--color-bg-secondary, #F9FAFB);
+  border-radius: 10px;
+}
+
+.settlement-rank {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #E5E7EB;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-md, 14px);
+  font-weight: 700;
+  color: var(--color-text-tertiary, #374151);
+  flex-shrink: 0;
+}
+
+.settlement-item:first-child .settlement-rank {
+  background: linear-gradient(135deg, #F59E0B, #D97706);
+  color: #fff;
+}
+
+.settlement-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.settlement-name {
+  flex: 1;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text-tertiary, #374151);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settlement-score {
+  font-size: 18px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.rename-link {
+  font-size: 11px;
+  color: var(--color-primary, #16A34A);
+  cursor: pointer;
+  margin-top: 4px;
+  padding: 2px 8px;
+  border-radius: 8px;
+  transition: background 0.15s ease;
+}
+
+.rename-link:active {
+  background: rgba(22, 163, 74, 0.1);
+}
+
+:deep(.van-action-sheet__content) {
+  max-height: 50vh;
+  overflow-y: auto;
+}
+</style>

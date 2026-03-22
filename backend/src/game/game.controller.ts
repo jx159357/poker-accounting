@@ -8,17 +8,28 @@ import {
   Param,
   Query,
   Request,
-  Headers,
+  UseGuards,
   BadRequestException,
 } from '@nestjs/common';
 import { GameService } from './game.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { CreateGameDto } from './dto/create-game.dto';
+import { JoinGameDto } from './dto/join-game.dto';
+import { AddScoreDto } from './dto/add-score.dto';
+import { UpdatePlayerNicknameDto } from './dto/update-player-nickname.dto';
+import { DeleteGameDto } from './dto/delete-game.dto';
+import { UpdateGameDto } from './dto/update-game.dto';
+import { AchievementService } from './achievement.service';
 
 @Controller('game')
 export class GameController {
-  constructor(private readonly gameService: GameService) {}
+  constructor(
+    private readonly gameService: GameService,
+    private readonly achievementService: AchievementService,
+  ) {}
 
   @Post('create')
-  async createGame(@Body() body: any) {
+  async createGame(@Body() body: CreateGameDto) {
     return this.gameService.createGame(
       body.name,
       body.gameType || '其他',
@@ -29,7 +40,10 @@ export class GameController {
   }
 
   @Post('join/:roomCode')
-  async joinGame(@Param('roomCode') roomCode: string, @Body() body: any) {
+  async joinGame(
+    @Param('roomCode') roomCode: string,
+    @Body() body: JoinGameDto,
+  ) {
     return this.gameService.joinGame(
       roomCode,
       body.nickname,
@@ -38,21 +52,63 @@ export class GameController {
     );
   }
 
-  @Get(':roomCode')
-  async getGameDetail(@Param('roomCode') roomCode: string) {
-    return this.gameService.getGameDetail(roomCode);
-  }
+  // === 具名路由放在 :roomCode 之前 ===
 
   @Get('my-games/list')
   async getMyGames(
     @Query('playerId') playerId: string,
     @Query('playerType') playerType: string,
+    @Query('gameType') gameType?: string,
+    @Query('status') status?: string,
   ) {
-    return this.gameService.getMyGames(playerId, playerType);
+    const filters: any = {};
+    if (gameType) filters.gameType = gameType;
+    if (status) filters.status = status;
+    return this.gameService.getMyGames(playerId, playerType, Object.keys(filters).length ? filters : undefined);
+  }
+
+  @Get('stats/data')
+  async getStats(
+    @Query('playerId') playerId: string,
+    @Query('playerType') playerType: string,
+  ) {
+    return this.gameService.getStats(playerId, playerType);
+  }
+
+  @Get('stats/opponents')
+  async getOpponentStats(
+    @Query('playerId') playerId: string,
+    @Query('playerType') playerType: string,
+  ) {
+    return this.gameService.getOpponentStats(playerId, playerType);
+  }
+
+  @Get('stats/leaderboard')
+  async getLeaderboard(@Query('limit') limit?: string) {
+    return this.gameService.getLeaderboard(limit ? parseInt(limit) : 20);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('stats/achievements')
+  async getAchievements(@Request() req) {
+    if (!req.user?.userId) {
+      return [];
+    }
+    return this.achievementService.getUserAchievements(req.user.userId);
+  }
+
+  // === 通配符路由 ===
+
+  @Get(':roomCode')
+  async getGameDetail(@Param('roomCode') roomCode: string) {
+    return this.gameService.getGameDetail(roomCode);
   }
 
   @Post(':roomCode/score')
-  async addScore(@Param('roomCode') roomCode: string, @Body() body: any) {
+  async addScore(
+    @Param('roomCode') roomCode: string,
+    @Body() body: AddScoreDto,
+  ) {
     return this.gameService.addScore(
       roomCode,
       body.fromPlayerId,
@@ -66,23 +122,17 @@ export class GameController {
   async undoScore(
     @Param('roomCode') roomCode: string,
     @Param('recordId') recordId: string,
-    @Headers('x-guest-id') guestId: string,
-    @Request() req,
+    @Body('requesterId') requesterId: string,
   ) {
-    // 获取请求者ID
-    let requesterId: string;
-
-    if (req.user) {
-      // 注册用户
-      requesterId = `user_${req.user.username}`;
-    } else if (guestId) {
-      // 游客
-      requesterId = guestId;
-    } else {
-      throw new BadRequestException('未授权');
+    if (!requesterId) {
+      throw new BadRequestException('请提供请求者ID');
     }
 
-    await this.gameService.undoScore(roomCode, parseInt(recordId), requesterId);
+    await this.gameService.undoScore(
+      roomCode,
+      parseInt(recordId),
+      requesterId,
+    );
 
     return { message: '撤销成功' };
   }
@@ -91,7 +141,7 @@ export class GameController {
   async updatePlayerNickname(
     @Param('roomCode') roomCode: string,
     @Param('playerId') playerId: number,
-    @Body() body: any,
+    @Body() body: UpdatePlayerNicknameDto,
   ) {
     return this.gameService.updatePlayerNickname(
       roomCode,
@@ -106,15 +156,20 @@ export class GameController {
   }
 
   @Delete(':roomCode')
-  async deleteGame(@Param('roomCode') roomCode: string, @Body() body: any) {
+  async deleteGame(
+    @Param('roomCode') roomCode: string,
+    @Body() body: DeleteGameDto,
+  ) {
     return this.gameService.deleteGame(roomCode, body.requesterId);
   }
 
-  @Get('stats/data')
-  async getStats(
-    @Query('playerId') playerId: string,
-    @Query('playerType') playerType: string,
+  @UseGuards(JwtAuthGuard)
+  @Patch(':roomCode')
+  async updateGame(
+    @Param('roomCode') roomCode: string,
+    @Request() req,
+    @Body() body: UpdateGameDto,
   ) {
-    return this.gameService.getStats(playerId, playerType);
+    return this.gameService.updateGame(roomCode, req.user.userId, body);
   }
 }

@@ -1,4 +1,4 @@
-import { IsString, IsArray, IsOptional } from 'class-validator';
+import { IsString, IsOptional, IsIn } from 'class-validator';
 
 export class CreateGameDto {
   @IsString()
@@ -8,12 +8,13 @@ export class CreateGameDto {
   @IsOptional()
   gameType?: string;
 
-  @IsArray()
-  @IsString({ each: true })
-  @IsOptional()
-  players?: string[];
+  @IsString()
+  creatorId: string;
 
   @IsString()
-  @IsOptional()
-  guestId?: string;
+  @IsIn(['user', 'guest'])
+  creatorType: string;
+
+  @IsString()
+  nickname: string;
 }

@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
   font-synthesis: none;
@@ -14,15 +14,129 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background-color: #f5f7fa;
-  color: #213547;
+  background-color: var(--color-bg, #F0F2F5);
+  color: var(--color-text-primary, #1A1A1A);
 }
 
 #app {
   width: 100%;
 }
 
-/* 动画效果 */
+/* ==================== 页面切换过渡动画 ==================== */
+.page-fade-enter-active,
+.page-fade-leave-active {
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.page-fade-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.page-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+/* ==================== 通用卡片样式 ==================== */
+.card {
+  background: var(--color-bg-card, #fff);
+  border-radius: var(--radius-md, 12px);
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card:active {
+  transform: scale(0.98);
+}
+
+.card-interactive {
+  cursor: pointer;
+}
+
+.card-interactive:active {
+  transform: scale(0.97);
+  box-shadow: var(--shadow-md);
+}
+
+/* ==================== 通用按钮反馈 ==================== */
+.btn-feedback {
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.btn-feedback:active {
+  transform: scale(0.95);
+  opacity: 0.85;
+}
+
+/* ==================== 分数颜色 ==================== */
+.score-positive {
+  color: var(--color-success, #16A34A);
+}
+
+.score-negative {
+  color: var(--color-danger, #EF4444);
+}
+
+/* score-badge: 标准尺寸 */
+.score-badge-positive {
+  background: rgba(22, 163, 74, 0.1);
+  color: var(--color-success, #16A34A);
+  border-radius: var(--radius-sm, 8px);
+  padding: 4px 12px;
+  font-weight: 700;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.score-badge-negative {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--color-danger, #EF4444);
+  border-radius: var(--radius-sm, 8px);
+  padding: 4px 12px;
+  font-weight: 700;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+/* score-badge-sm: 紧凑尺寸 */
+.score-badge-sm.score-badge-positive,
+.score-badge-positive.score-badge-sm {
+  padding: 2px 8px;
+  font-size: var(--font-size-md, 14px);
+  border-radius: 6px;
+}
+
+.score-badge-sm.score-badge-negative,
+.score-badge-negative.score-badge-sm {
+  padding: 2px 8px;
+  font-size: var(--font-size-md, 14px);
+  border-radius: 6px;
+}
+
+/* ==================== 游客提示条 ==================== */
+.guest-notice {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(22, 163, 74, 0.08);
+  color: var(--color-primary, #16A34A);
+  font-size: var(--font-size-sm, 13px);
+  padding: 10px 16px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* ==================== 状态色条 ==================== */
+.status-bar-active {
+  border-left: 3px solid var(--color-success, #16A34A);
+}
+
+.status-bar-ended {
+  border-left: 3px solid #D1D5DB;
+}
+
+/* ==================== 动画效果 ==================== */
 @keyframes slide-in {
   from {
     transform: translateX(100%);
@@ -39,41 +153,74 @@ body {
 }
 
 @keyframes fade-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .animate-fade-in {
   animation: fade-in 0.3s ease-out;
 }
 
-/* 自定义滚动条 */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.4s ease-out;
+}
+
+/* ==================== 隐藏滚动条 ==================== */
+* {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  display: none; /* Chrome/Safari/Opera */
 }
 
-::-webkit-scrollbar-track {
-  background: #f1f1f1;
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #888;
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #555;
-}
-
-/* 移动端优化 */
+/* ==================== 移动端优化 ==================== */
 @media (max-width: 640px) {
   body {
     font-size: 14px;
   }
+}
+
+/* ==================== Vant 组件微调 ==================== */
+.van-nav-bar {
+  background: var(--color-bg-white, #fff) !important;
+  border-bottom: 1px solid var(--color-border, #E5E7EB) !important;
+}
+
+.van-nav-bar__title {
+  font-weight: 600 !important;
+}
+
+.van-tabbar {
+  box-shadow: 0 -1px 12px rgba(0, 0, 0, 0.06) !important;
+  border-top: none !important;
+}
+
+.van-dialog {
+  border-radius: var(--radius-lg, 16px) !important;
+}
+
+.van-dialog__header {
+  font-weight: 600 !important;
+}
+
+.van-empty__description {
+  color: var(--color-text-secondary, #6B7280) !important;
+}
+
+.van-tag--success {
+  background: rgba(22, 163, 74, 0.1) !important;
+  color: #16A34A !important;
 }

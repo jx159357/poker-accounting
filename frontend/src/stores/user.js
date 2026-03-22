@@ -24,22 +24,26 @@ export const useUserStore = defineStore('user', () => {
     if (savedIsGuest !== null) {
       isGuest.value = savedIsGuest === 'true'
     }
-
-    console.log('User store initialized:', {
-      token: !!token.value,
-      username: username.value,
-      isGuest: isGuest.value
-    })
   }
 
-  // 注册
+  // 注册（游客自动转用户）
   const register = async (usernameInput, password) => {
     loading.value = true
     try {
-      const data = await authApi.register({
-        username: usernameInput,
-        password
-      })
+      let data
+      const guestId = localStorage.getItem('guestId')
+      if (isGuest.value && guestId) {
+        data = await authApi.guestToUser({
+          username: usernameInput,
+          password,
+          guestId
+        })
+      } else {
+        data = await authApi.register({
+          username: usernameInput,
+          password
+        })
+      }
 
       token.value = data.access_token
       username.value = data.username
@@ -48,8 +52,8 @@ export const useUserStore = defineStore('user', () => {
       localStorage.setItem('token', data.access_token)
       localStorage.setItem('username', data.username)
       localStorage.setItem('isGuest', 'false')
-
-      console.log('Registered successfully:', data.username)
+      localStorage.removeItem('guestId')
+      localStorage.removeItem('guestNickname')
     } catch (error) {
       throw new Error(error.response?.data?.message || '注册失败')
     } finally {
@@ -73,8 +77,6 @@ export const useUserStore = defineStore('user', () => {
       localStorage.setItem('token', data.access_token)
       localStorage.setItem('username', data.username)
       localStorage.setItem('isGuest', 'false')
-
-      console.log('Logged in successfully:', data.username)
     } catch (error) {
       throw new Error(error.response?.data?.message || '登录失败')
     } finally {
@@ -91,8 +93,6 @@ export const useUserStore = defineStore('user', () => {
     localStorage.setItem('isGuest', 'true')
     localStorage.removeItem('token')
     localStorage.removeItem('username')
-
-    console.log('Guest mode activated')
   }
 
   // 退出登录
@@ -106,8 +106,6 @@ export const useUserStore = defineStore('user', () => {
     localStorage.removeItem('isGuest')
     localStorage.removeItem('guestId')
     localStorage.removeItem('guestNickname')
-
-    console.log('Logged out')
   }
 
   // 页面加载时初始化

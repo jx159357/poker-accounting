@@ -2,7 +2,9 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ServeStaticModule } from '@nestjs/serve-static';
+import { join } from 'path';
 import { AuthModule } from './auth/auth.module';
 import { GameModule } from './game/game.module';
 
@@ -21,16 +23,26 @@ import { GameModule } from './game/game.module';
     ThrottlerModule.forRoot([
       {
         ttl: 60000, // 60秒
-        limit: 99999, // 100次请求
+        limit: 100, // 100次请求
       },
     ]),
 
     // 数据库配置
-    TypeOrmModule.forRoot({
-      type: 'sqlite',
-      database: 'poker-accounting.db',
-      entities: [__dirname + '/**/*.entity{.ts,.js}'],
-      synchronize: true,
+    TypeOrmModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        type: 'sqlite',
+        database: configService.get('DB_PATH', './data/poker-accounting.db'),
+        entities: [__dirname + '/**/*.entity{.ts,.js}'],
+        synchronize: configService.get('NODE_ENV', 'development') !== 'production',
+      }),
+    }),
+
+    // 静态文件服务（前端构建产物）
+    ServeStaticModule.forRoot({
+      rootPath: join(__dirname, '..', 'public'),
+      exclude: ['/api/(.*)'],
     }),
 
     AuthModule,
