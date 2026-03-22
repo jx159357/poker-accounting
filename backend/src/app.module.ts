@@ -35,14 +35,15 @@ import { GameModule } from './game/game.module';
         type: 'sqlite',
         database: configService.get('DB_PATH', './data/poker-accounting.db'),
         entities: [__dirname + '/**/*.entity{.ts,.js}'],
-        synchronize: configService.get('NODE_ENV', 'development') !== 'production',
+        synchronize:
+          configService.get('NODE_ENV', 'development') !== 'production',
       }),
     }),
 
     // 静态文件服务（前端构建产物）
     ServeStaticModule.forRoot({
       rootPath: join(__dirname, '..', 'public'),
-      exclude: ['/api/(.*)'],
+      exclude: ['/api*'],
     }),
 
     AuthModule,
