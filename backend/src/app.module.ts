@@ -43,7 +43,7 @@ import { GameModule } from './game/game.module';
     // 静态文件服务（前端构建产物）
     ServeStaticModule.forRoot({
       rootPath: join(__dirname, '..', 'public'),
-      exclude: ['/api*'],
+      exclude: ['/api/{*path}'],
     }),
 
     AuthModule,
