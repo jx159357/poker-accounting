@@ -68,7 +68,9 @@
                   v-if="!isEditing"
                   size="small"
                   type="primary"
+                  plain
                   round
+                  class="action-btn-toolbar"
                   @click="startEdit"
                 >
                   修改
@@ -81,6 +83,7 @@
               block
               type="primary"
               round
+              class="action-btn-primary"
               @click="handleSaveNickname"
               :loading="saving"
             >
@@ -88,7 +91,10 @@
             </van-button>
             <van-button
               block
+              plain
+              type="primary"
               round
+              class="action-btn-secondary"
               @click="cancelEdit"
             >
               取消
@@ -111,9 +117,10 @@
             type="primary"
             block
             round
+            class="action-btn-primary"
             @click="router.push('/register')"
           >
-            注册账号
+            立即注册
           </van-button>
         </div>
 
@@ -146,6 +153,7 @@
                 block
                 type="primary"
                 round
+                class="action-btn-primary"
                 @click="handleChangePassword"
                 :loading="savingPassword"
               >
@@ -498,6 +506,10 @@ onMounted(() => {
   padding: 12px 16px 16px;
   display: flex;
   gap: 10px;
+}
+
+.edit-actions :deep(.van-button) {
+  flex: 1;
 }
 
 .guest-card {

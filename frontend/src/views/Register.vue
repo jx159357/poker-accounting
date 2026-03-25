@@ -21,6 +21,11 @@
           <span>注册后将自动迁移你的游戏数据</span>
         </div>
 
+        <div class="auth-card-head">
+          <div class="auth-card-title">创建账号</div>
+          <div class="auth-card-subtitle">注册后可保存对局、同步房间，并查看更完整的统计数据。</div>
+        </div>
+
         <van-form @submit="handleRegister">
           <van-field
             v-model="registerForm.username"
@@ -53,16 +58,16 @@
               type="primary"
               native-type="submit"
               :loading="userStore.loading"
-              class="btn-register"
+              class="btn-register action-btn-primary"
             >
-              注册
+              注册账号
             </van-button>
 
             <van-button
               round
               block
               plain
-              class="btn-back"
+              class="btn-back action-btn-secondary"
               @click="handleBack"
             >
               返回登录
@@ -179,6 +184,23 @@ const handleBack = () => {
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
 }
 
+.auth-card-head {
+  margin-bottom: 18px;
+}
+
+.auth-card-title {
+  font-size: calc(20px * var(--font-scale, 1));
+  font-weight: 700;
+  color: var(--color-text-primary, #1A1A1A);
+}
+
+.auth-card-subtitle {
+  margin-top: 6px;
+  font-size: var(--font-size-sm, 13px);
+  line-height: 1.5;
+  color: var(--color-text-secondary, #6B7280);
+}
+
 .form-actions {
   margin-top: 28px;
   display: flex;
@@ -187,16 +209,12 @@ const handleBack = () => {
 }
 
 .btn-register {
-  height: 44px;
   font-size: calc(16px * var(--font-scale, 1));
   font-weight: 600;
 }
 
 .btn-back {
-  height: 44px;
   font-size: calc(15px * var(--font-scale, 1));
-  color: var(--color-text-secondary, #6B7280) !important;
-  border-color: #D1D5DB !important;
 }
 
 .migrate-notice {

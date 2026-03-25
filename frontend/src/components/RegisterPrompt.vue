@@ -2,21 +2,25 @@
   <van-popup
     :show="visible"
     round
-    closeable
     position="bottom"
     :style="{ maxHeight: '70%' }"
     @update:show="$emit('update:visible', $event)"
   >
-    <div class="register-prompt">
-      <div class="prompt-hero">
+    <div class="register-prompt overlay-panel-surface">
+      <div class="prompt-hero overlay-panel-head">
         <div class="prompt-hero-copy">
           <h3 class="prompt-title">注册解锁更多功能</h3>
           <p class="prompt-desc">{{ promptDescription }}</p>
         </div>
-        <div class="prompt-hero-badge">PRO</div>
+        <div class="prompt-hero-actions">
+          <div class="prompt-hero-badge overlay-panel-badge">更多功能</div>
+          <button type="button" class="prompt-close overlay-panel-close" @click="$emit('update:visible', false)">
+            <van-icon name="cross" size="18" />
+          </button>
+        </div>
       </div>
 
-      <div class="benefits-list">
+      <div class="benefits-list overlay-panel-block">
         <div class="benefit-item">
           <van-icon name="records-o" size="20" color="#16A34A" />
           <span>不限房间数量</span>
@@ -43,7 +47,7 @@
         type="primary"
         block
         round
-        class="prompt-btn"
+        class="prompt-btn action-btn-primary"
         @click="goRegister"
       >
         立即注册
@@ -52,7 +56,8 @@
         block
         round
         plain
-        class="prompt-btn-secondary"
+        type="primary"
+        class="prompt-btn-secondary action-btn-secondary"
         @click="$emit('update:visible', false)"
       >
         以后再说
@@ -102,15 +107,9 @@ const goRegister = () => {
 <style scoped>
 .register-prompt {
   padding: 24px 20px 32px;
-  background:
-    radial-gradient(circle at top right, rgba(22, 163, 74, 0.08), transparent 180px),
-    var(--color-bg-white, #fff);
 }
 
 .prompt-hero {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
   gap: 12px;
 }
 
@@ -119,14 +118,21 @@ const goRegister = () => {
   min-width: 0;
 }
 
+.prompt-hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
 .prompt-hero-badge {
   flex-shrink: 0;
-  border-radius: 999px;
-  padding: 6px 10px;
-  background: var(--color-primary-bg, rgba(22, 163, 74, 0.08));
-  color: var(--color-primary, #16A34A);
   font-size: var(--font-size-xs, 12px);
   font-weight: 800;
+}
+
+.prompt-close {
+  flex-shrink: 0;
 }
 
 .prompt-title {
@@ -151,7 +157,6 @@ const goRegister = () => {
   gap: 12px;
   margin-bottom: 24px;
   padding: 16px;
-  background: linear-gradient(180deg, #F0FDF4, #F8FAFC);
   border-radius: 16px;
 }
 
@@ -168,17 +173,13 @@ const goRegister = () => {
 }
 
 .prompt-btn {
-  height: 44px;
   font-size: calc(16px * var(--font-scale, 1));
   font-weight: 600;
   margin-bottom: 10px;
 }
 
 .prompt-btn-secondary {
-  height: 44px;
   font-size: calc(15px * var(--font-scale, 1));
-  color: #6B7280 !important;
-  border-color: #D1D5DB !important;
 }
 
 @media (max-width: 380px) {

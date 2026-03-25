@@ -5,16 +5,18 @@
     position="center"
     :style="{ width: '92%', maxWidth: '420px' }"
   >
-    <div class="scan-popup">
-      <div class="scan-header">
+    <div class="scan-popup overlay-panel-surface">
+      <div class="scan-header overlay-panel-head">
         <div>
           <div class="scan-title">扫码加入房间</div>
-          <div class="scan-subtitle">{{ scanSubtitle }}</div>
+          <div class="scan-subtitle overlay-panel-subtitle">{{ scanSubtitle }}</div>
         </div>
-        <button type="button" class="scan-close" @click="visible = false">关闭</button>
+        <button type="button" class="scan-close overlay-panel-close" @click="visible = false">
+          <van-icon name="cross" size="18" />
+        </button>
       </div>
 
-      <div class="scan-viewfinder">
+      <div class="scan-viewfinder overlay-panel-block">
         <video ref="videoRef" class="scan-video" muted playsinline />
         <div ref="overlayRef" class="scan-overlay" />
         <div class="scan-frame" />
@@ -28,13 +30,13 @@
       </div>
 
       <div class="scan-actions">
-        <van-button block round type="primary" @click="pickCameraCapture">
+        <van-button block round type="primary" class="action-btn-primary" @click="pickCameraCapture">
           拍照识别二维码
         </van-button>
-        <van-button block round plain type="primary" @click="pickImage">
-          从相册选择图片
+        <van-button block round plain type="primary" class="action-btn-secondary" @click="pickImage">
+          从相册识别二维码
         </van-button>
-        <van-button block round @click="emit('manual-entry')">
+        <van-button block round plain type="primary" class="action-btn-secondary" @click="emit('manual-entry')">
           手动输入房间号
         </van-button>
       </div>
@@ -227,16 +229,11 @@ onUnmounted(() => {
 <style scoped>
 .scan-popup {
   padding: 18px 18px 22px;
-  background:
-    radial-gradient(circle at top left, var(--color-primary-bg, rgba(22, 163, 74, 0.08)), transparent 180px),
-    var(--color-bg-white, #fff);
   border-radius: 24px;
+  border: 1px solid var(--color-border, #E5E7EB);
 }
 
 .scan-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
   gap: 12px;
 }
 
@@ -247,18 +244,13 @@ onUnmounted(() => {
 }
 
 .scan-subtitle {
-  margin-top: 6px;
   font-size: var(--font-size-sm, 13px);
   color: var(--color-text-secondary, #6B7280);
   line-height: 1.5;
 }
 
 .scan-close {
-  border: none;
-  background: transparent;
   color: var(--color-text-secondary, #6B7280);
-  font-size: var(--font-size-sm, 13px);
-  padding: 4px 0;
 }
 
 .scan-viewfinder {

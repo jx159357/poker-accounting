@@ -5,20 +5,20 @@
     position="center"
     :style="{ width: '90%', maxWidth: '420px' }"
   >
-    <div class="invite-popup">
-      <button type="button" class="invite-close" @click="visible = false">
+    <div class="invite-popup overlay-panel-surface">
+      <button type="button" class="invite-close overlay-panel-close" @click="visible = false">
         <van-icon name="cross" size="18" />
       </button>
 
-      <div class="invite-hero">
+      <div class="invite-hero overlay-panel-head">
         <div>
           <div class="invite-title">扫码加入房间</div>
-          <div class="invite-subtitle">打开打牌记账后扫码，或识别下方二维码直接进入</div>
+          <div class="invite-subtitle overlay-panel-subtitle">打开打牌记账后扫码，或识别下方二维码直接进入</div>
         </div>
-        <div class="invite-code-chip">{{ roomCode }}</div>
+        <div class="invite-code-chip overlay-panel-badge">{{ roomCode }}</div>
       </div>
 
-      <div class="invite-qr-shell">
+      <div class="invite-qr-shell overlay-panel-block">
         <van-loading v-if="loading" size="24" />
         <img v-else-if="qrDataUrl" :src="qrDataUrl" alt="房间二维码" class="invite-qr-image" />
         <div class="invite-room-name">{{ roomName || '打牌记账房间' }}</div>
@@ -26,14 +26,14 @@
       </div>
 
       <div class="invite-actions">
-        <van-button block round type="primary" @click="handleShareOrCopy">
-          {{ canUseNativeShare ? '系统分享' : '复制邀请信息' }}
+        <van-button block round type="primary" class="action-btn-primary" @click="handleShareOrCopy">
+          {{ canUseNativeShare ? '分享邀请' : '复制邀请信息' }}
         </van-button>
-        <van-button block round plain type="primary" @click="copyRoomCode">
-          复制房间号
+        <van-button block round plain type="primary" class="action-btn-secondary" @click="copyRoomCode">
+          仅复制房间号
         </van-button>
-        <van-button v-if="qrDataUrl" block round plain @click="downloadQrImage">
-          保存二维码
+        <van-button v-if="qrDataUrl" block round plain type="primary" class="action-btn-secondary" @click="downloadQrImage">
+          保存二维码图片
         </van-button>
       </div>
     </div>
@@ -179,31 +179,18 @@ watch(
 .invite-popup {
   position: relative;
   padding: 20px 18px 22px;
-  background:
-    radial-gradient(circle at top right, var(--color-primary-bg, rgba(22, 163, 74, 0.08)), transparent 140px),
-    var(--color-bg-white, #fff);
   border-radius: 24px;
+  border: 1px solid var(--color-border, #E5E7EB);
 }
 
 .invite-close {
   position: absolute;
   top: 14px;
   right: 14px;
-  width: 32px;
-  height: 32px;
-  border: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
   color: var(--color-text-secondary, #6B7280);
-  background: rgba(15, 23, 42, 0.06);
 }
 
 .invite-hero {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
   gap: 16px;
   padding-right: 28px;
 }
@@ -215,17 +202,12 @@ watch(
 }
 
 .invite-subtitle {
-  margin-top: 6px;
   font-size: var(--font-size-sm, 13px);
   color: var(--color-text-secondary, #6B7280);
 }
 
 .invite-code-chip {
   flex-shrink: 0;
-  background: var(--color-primary-bg, rgba(22, 163, 74, 0.08));
-  color: var(--color-primary, #16A34A);
-  border-radius: 999px;
-  padding: 6px 12px;
   font-size: var(--font-size-md, 14px);
   font-weight: 700;
 }
@@ -237,8 +219,6 @@ watch(
   align-items: center;
   justify-content: center;
   gap: 10px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(249, 250, 251, 0.96));
-  border: 1px solid var(--color-border, #E5E7EB);
   border-radius: 20px;
   padding: 20px;
 }

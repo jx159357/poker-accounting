@@ -9,6 +9,7 @@ const themeOptions = [
   {
     key: 'table-green',
     label: '牌桌绿',
+    description: '清爽稳定，适合长时间记账',
     preview: ['#1F9D55', '#157347'],
     variables: {
       '--color-primary': '#1F9D55',
@@ -26,6 +27,7 @@ const themeOptions = [
   {
     key: 'sea-blue',
     label: '海雾蓝',
+    description: '更安静，适合理性的视觉风格',
     preview: ['#2C6E9F', '#1F5378'],
     variables: {
       '--color-primary': '#2C6E9F',
@@ -43,6 +45,7 @@ const themeOptions = [
   {
     key: 'warm-sand',
     label: '暖砂橙',
+    description: '更柔和，适合生活化的氛围',
     preview: ['#C9834A', '#A86436'],
     variables: {
       '--color-primary': '#C9834A',
@@ -60,6 +63,7 @@ const themeOptions = [
   {
     key: 'ink-slate',
     label: '雾岩灰',
+    description: '低调克制，适合信息密度较高的页面',
     preview: ['#5B6574', '#404854'],
     variables: {
       '--color-primary': '#5B6574',

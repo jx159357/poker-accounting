@@ -9,7 +9,17 @@
       <van-nav-bar title="界面设置" left-arrow @click-left="settingsStore.closeDrawer()" />
 
       <div class="drawer-body">
-        <section class="settings-card">
+        <section class="settings-save-banner overlay-panel-block">
+          <div class="settings-save-head overlay-panel-head">
+            <div>
+              <div class="settings-save-title">设置会自动保存</div>
+              <div class="settings-save-desc">下次打开会继续使用当前主题和字号，不需要重复调整。</div>
+            </div>
+            <span class="settings-save-badge overlay-panel-badge">自动保存</span>
+          </div>
+        </section>
+
+        <section class="settings-card overlay-panel-block">
           <div class="settings-title">字体大小</div>
           <div class="option-grid">
             <button
@@ -26,7 +36,7 @@
           </div>
         </section>
 
-        <section class="settings-card">
+        <section class="settings-card overlay-panel-block">
           <div class="settings-title">主题颜色</div>
           <div class="theme-grid">
             <button
@@ -41,12 +51,15 @@
                 class="theme-swatch"
                 :style="{ background: `linear-gradient(135deg, ${theme.preview[0]}, ${theme.preview[1]})` }"
               />
-              <span class="theme-name">{{ theme.label }}</span>
+              <span>
+                <span class="theme-name">{{ theme.label }}</span>
+                <span class="theme-desc">{{ theme.description }}</span>
+              </span>
             </button>
           </div>
         </section>
 
-        <section class="settings-card">
+        <section class="settings-card overlay-panel-block">
           <div class="settings-title">实时预览</div>
           <div class="preview-card">
             <div class="preview-header">
@@ -54,11 +67,15 @@
                 <div class="preview-title">移动端显示预览</div>
                 <div class="preview-subtitle">修改后会立即应用到首页、统计和牌局页面</div>
               </div>
-              <span class="preview-badge">+128</span>
+              <span class="preview-badge overlay-panel-badge">实时生效</span>
             </div>
             <div class="preview-row">
               <span class="preview-label">当前主题</span>
               <span class="preview-value">{{ activeThemeLabel }}</span>
+            </div>
+            <div class="preview-row">
+              <span class="preview-label">主题说明</span>
+              <span class="preview-value preview-value-muted">{{ activeThemeDescription }}</span>
             </div>
             <div class="preview-row">
               <span class="preview-label">当前字号</span>
@@ -67,7 +84,7 @@
           </div>
         </section>
 
-        <section class="settings-card">
+        <section class="settings-card overlay-panel-block">
           <div class="settings-title">快捷入口</div>
           <van-cell-group inset>
             <van-cell title="个人资料" is-link @click="goToProfile" />
@@ -79,6 +96,8 @@
             />
           </van-cell-group>
         </section>
+
+        <div class="settings-footer-note">主题和字号仅保存在当前设备浏览器中。</div>
       </div>
     </div>
   </van-popup>
@@ -101,6 +120,10 @@ const activeThemeLabel = computed(() => {
 
 const activeFontScaleLabel = computed(() => {
   return settingsStore.fontScaleOptions.find(option => option.key === settingsStore.fontScale)?.label || '默认'
+})
+
+const activeThemeDescription = computed(() => {
+  return settingsStore.themeOptions.find(theme => theme.key === settingsStore.theme)?.description || '清爽稳定'
 })
 
 const goToProfile = () => {
@@ -142,9 +165,34 @@ const handleLogout = () => {
   gap: 14px;
 }
 
+.settings-save-banner {
+  padding: 14px 16px;
+}
+
+.settings-save-head {
+  align-items: flex-start;
+}
+
+.settings-save-badge {
+  flex-shrink: 0;
+}
+
+.settings-save-title {
+  font-size: var(--font-size-lg, 16px);
+  font-weight: 700;
+  color: var(--color-text-primary, #1A1A1A);
+}
+
+.settings-save-desc {
+  margin-top: 4px;
+  font-size: var(--font-size-sm, 13px);
+  line-height: 1.5;
+  color: var(--color-text-secondary, #6B7280);
+}
+
 .settings-card {
   background: var(--color-bg-white, #fff);
-  border-radius: var(--radius-md, 12px);
+  border-radius: var(--radius-lg, 16px);
   box-shadow: var(--shadow-sm);
   padding: 16px;
 }
@@ -165,8 +213,9 @@ const handleLogout = () => {
 .option-chip,
 .theme-chip {
   border: 1px solid var(--color-border, #E5E7EB);
-  background: var(--color-bg-secondary, #F9FAFB);
-  border-radius: 12px;
+  background:
+    linear-gradient(135deg, rgba(249, 250, 251, 0.95), rgba(255, 255, 255, 0.98));
+  border-radius: 14px;
   padding: 12px;
   text-align: left;
   transition: border-color 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
@@ -181,7 +230,7 @@ const handleLogout = () => {
 .theme-chip-active {
   border-color: var(--color-primary, #16A34A);
   box-shadow: 0 0 0 3px var(--color-primary-bg, rgba(22, 163, 74, 0.08));
-  background: #fff;
+  background: rgba(255, 255, 255, 1);
 }
 
 .option-label,
@@ -216,6 +265,14 @@ const handleLogout = () => {
   height: 34px;
   border-radius: 10px;
   flex-shrink: 0;
+}
+
+.theme-desc {
+  display: block;
+  margin-top: 4px;
+  font-size: var(--font-size-xs, 12px);
+  line-height: 1.45;
+  color: var(--color-text-placeholder, #9CA3AF);
 }
 
 .preview-card {
@@ -272,5 +329,19 @@ const handleLogout = () => {
   font-size: calc(14px * var(--font-scale, 1));
   font-weight: 600;
   color: var(--color-text-tertiary, #374151);
+}
+
+.preview-value-muted {
+  max-width: 56%;
+  text-align: right;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.settings-footer-note {
+  text-align: center;
+  font-size: var(--font-size-xs, 12px);
+  color: var(--color-text-placeholder, #9CA3AF);
+  padding-bottom: 8px;
 }
 </style>

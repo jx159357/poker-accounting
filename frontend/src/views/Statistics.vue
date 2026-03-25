@@ -35,6 +35,33 @@
       <!-- Zone B: 可滚动详细区域 -->
       <div class="flex-1 overflow-y-auto min-h-0 p-4 pt-0">
         <div class="stats-content">
+        <div class="summary-card">
+          <div class="summary-card-head">
+            <div>
+              <div class="summary-card-title">本期摘要</div>
+              <div class="summary-card-desc">先看整体状态，再决定要不要展开详细统计。</div>
+            </div>
+            <span class="summary-card-badge">{{ headlineStatus }}</span>
+          </div>
+
+          <div class="summary-grid">
+            <div class="summary-item">
+              <div class="summary-label">最近表现</div>
+              <div class="summary-value">{{ recentAverageScore }}</div>
+              <div class="summary-meta">{{ recentTrendLabel }}</div>
+            </div>
+            <div class="summary-item">
+              <div class="summary-label">常玩类型</div>
+              <div class="summary-value">{{ favoriteType }}</div>
+              <div class="summary-meta">{{ favoriteTypeMeta }}</div>
+            </div>
+            <div class="summary-item">
+              <div class="summary-label">当前状态</div>
+              <div class="summary-value">{{ streakLabel }}</div>
+              <div class="summary-meta">{{ scoreHeadline }}</div>
+            </div>
+          </div>
+        </div>
 
         <!-- 注册用户专属模块 -->
         <template v-if="!userStore.isGuest">
@@ -256,19 +283,21 @@
           round
           plain
           type="primary"
-          class="export-btn"
+          class="export-btn action-btn-secondary"
           @click="exportCSV"
         >
-          导出数据 (CSV)
+          导出最近对局 (CSV)
         </van-button>
 
         <!-- 游客注册引导 -->
         <RegisterPrompt v-if="userStore.isGuest" v-model:visible="showRegisterPrompt" source="statistics" />
         <div v-if="userStore.isGuest" class="guest-register-card" @click="showRegisterPrompt = true">
-          <van-icon name="chart-trending-o" size="24" color="#16A34A" />
+          <div class="guest-register-icon-wrap">
+            <van-icon name="chart-trending-o" size="24" color="#16A34A" />
+          </div>
           <div class="guest-register-text">
             <div class="guest-register-title">解锁高级统计</div>
-            <div class="guest-register-desc">注册后可查看个人记录、对手分析、排行榜等</div>
+            <div class="guest-register-desc">注册后可查看个人记录、对手分析、排行榜和更完整的历史统计</div>
           </div>
           <van-icon name="arrow" size="16" color="#9CA3AF" />
         </div>
@@ -281,7 +310,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useGameStore } from '../stores/game';
 import { useUserStore } from '../stores/user';
@@ -308,6 +337,49 @@ const expanded = ref({
   gameType: false,
   recentGames: false,
   achievementProgress: false,
+});
+
+const favoriteType = computed(() => {
+  return stats.value?.gameTypeStats?.[0]?.gameType || '暂无';
+});
+
+const favoriteTypeMeta = computed(() => {
+  const item = stats.value?.gameTypeStats?.[0];
+  if (!item) return '还没有形成偏好';
+  return `${item.count} 场 · 胜率 ${item.winRate}%`;
+});
+
+const recentAverageScore = computed(() => {
+  const recentGames = stats.value?.recentGames || [];
+  if (!recentGames.length) return '--';
+  const total = recentGames.reduce((sum, game) => sum + Number(game.score || 0), 0);
+  const average = total / recentGames.length;
+  return `${average >= 0 ? '+' : ''}${average.toFixed(1)}`;
+});
+
+const recentTrendLabel = computed(() => {
+  const recentGames = stats.value?.recentGames || [];
+  if (!recentGames.length) return '还没有最近数据';
+  const positiveGames = recentGames.filter(game => Number(game.score) > 0).length;
+  return positiveGames >= Math.ceil(recentGames.length / 2) ? '最近状态偏强' : '最近更适合稳一点';
+});
+
+const streakLabel = computed(() => {
+  const streak = stats.value?.currentStreak;
+  if (!streak || streak.type === 'none') return '无连胜连败';
+  return streak.type === 'win' ? `${streak.count} 连胜` : `${streak.count} 连败`;
+});
+
+const scoreHeadline = computed(() => {
+  if (!stats.value) return '暂无摘要';
+  return Number(stats.value.totalScore) >= 0 ? '当前总体处于盈利区间' : '当前总体处于回撤区间';
+});
+
+const headlineStatus = computed(() => {
+  if (!stats.value) return '暂无';
+  if (Number(stats.value.totalScore) > 0 && Number(stats.value.winRate) >= 50) return '状态不错';
+  if (Number(stats.value.totalScore) < 0 && Number(stats.value.winRate) < 50) return '先稳节奏';
+  return '继续观察';
 });
 
 const toggleSection = (key) => {
@@ -337,7 +409,7 @@ const goToRoom = (roomCode) => {
 
 const exportCSV = () => {
   if (!stats.value?.recentGames?.length) {
-    showToast('暂无数据可导出');
+    showToast('暂无最近对局可导出');
     return;
   }
 
@@ -394,12 +466,84 @@ onMounted(() => {
   padding-top: 16px;
 }
 
+.summary-card {
+  background:
+    radial-gradient(circle at top right, var(--color-primary-bg, rgba(22, 163, 74, 0.08)), transparent 120px),
+    var(--color-bg-white, #fff);
+  border-radius: 16px;
+  box-shadow: var(--shadow-sm);
+  padding: 16px;
+}
+
+.summary-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.summary-card-title {
+  font-size: var(--font-size-lg, 16px);
+  font-weight: 700;
+  color: var(--color-text-primary, #1A1A1A);
+}
+
+.summary-card-desc {
+  margin-top: 4px;
+  font-size: var(--font-size-sm, 13px);
+  color: var(--color-text-secondary, #6B7280);
+}
+
+.summary-card-badge {
+  flex-shrink: 0;
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: var(--color-primary-bg, rgba(22, 163, 74, 0.08));
+  color: var(--color-primary, #16A34A);
+  font-size: var(--font-size-xs, 12px);
+  font-weight: 700;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.summary-item {
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--color-bg-secondary, #F9FAFB);
+}
+
+.summary-label {
+  font-size: var(--font-size-xs, 12px);
+  color: var(--color-text-placeholder, #9CA3AF);
+}
+
+.summary-value {
+  margin-top: 6px;
+  font-size: calc(16px * var(--font-scale, 1));
+  font-weight: 700;
+  color: var(--color-text-primary, #1A1A1A);
+}
+
+.summary-meta {
+  margin-top: 4px;
+  font-size: var(--font-size-xs, 12px);
+  line-height: 1.45;
+  color: var(--color-text-secondary, #6B7280);
+}
+
 .stats-bar {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 0;
-  background: var(--color-bg-white, #fff);
-  border-radius: var(--radius-md, 12px);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 1)),
+    var(--color-bg-white, #fff);
+  border-radius: 16px;
   box-shadow: var(--shadow-sm);
   padding: 10px 0;
 }
@@ -428,7 +572,7 @@ onMounted(() => {
 
 .section-card {
   background: var(--color-bg-white, #fff);
-  border-radius: var(--radius-md, 12px);
+  border-radius: 16px;
   box-shadow: var(--shadow-sm);
   overflow: hidden;
 }
@@ -653,8 +797,10 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 12px;
-  background: var(--color-bg-white, #fff);
-  border-radius: var(--radius-md, 12px);
+  background:
+    radial-gradient(circle at top right, rgba(22, 163, 74, 0.08), transparent 120px),
+    var(--color-bg-white, #fff);
+  border-radius: 16px;
   padding: 16px;
   box-shadow: var(--shadow-sm);
   cursor: pointer;
@@ -669,6 +815,17 @@ onMounted(() => {
   flex: 1;
 }
 
+.guest-register-icon-wrap {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-primary-bg, rgba(22, 163, 74, 0.08));
+  flex-shrink: 0;
+}
+
 .guest-register-title {
   font-size: calc(15px * var(--font-scale, 1));
   font-weight: 600;
@@ -679,5 +836,11 @@ onMounted(() => {
   font-size: var(--font-size-sm, 13px);
   color: var(--color-text-placeholder, #9CA3AF);
   margin-top: 2px;
+}
+
+@media (max-width: 420px) {
+  .summary-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

@@ -93,9 +93,18 @@
       position="center"
       :style="{ width: '88%', maxWidth: '420px' }"
     >
-      <div class="history-search-popup">
-        <div class="history-search-head">
-          <div class="history-search-title">搜索历史房间</div>
+      <div class="history-search-popup overlay-panel-surface">
+        <div class="history-search-head overlay-panel-head">
+          <div>
+            <div class="history-search-title">搜索历史房间</div>
+            <div class="history-search-subtitle overlay-panel-subtitle">输入房间名、房间号或游戏类型，结果会实时筛选。</div>
+          </div>
+          <button type="button" class="history-search-close overlay-panel-close" @click="showSearchPopup = false">
+            <van-icon name="cross" size="18" />
+          </button>
+        </div>
+        <div class="history-search-toolbar">
+          <span class="overlay-panel-badge">{{ displayedGames.length }} 条结果</span>
           <button
             v-if="searchKeyword"
             type="button"
@@ -105,7 +114,7 @@
             清空
           </button>
         </div>
-        <label class="history-search-shell">
+        <label class="history-search-shell overlay-panel-input">
           <van-icon name="search" size="16" color="#94A3B8" />
           <input
             v-model.trim="searchKeyword"
@@ -114,8 +123,8 @@
             placeholder="搜索房间名、房间号或游戏类型"
           />
         </label>
-        <van-button block round plain class="history-search-btn" @click="showSearchPopup = false">
-          完成
+        <van-button block round plain class="history-search-btn action-btn-secondary" @click="showSearchPopup = false">
+          完成搜索
         </van-button>
       </div>
     </van-popup>
@@ -325,37 +334,43 @@ onMounted(() => {
 
 .history-search-popup {
   padding: 18px;
+  border: 1px solid var(--color-border, #E5E7EB);
 }
 
 .history-search-title {
-  font-size: var(--font-size-lg, 16px);
+  font-size: var(--font-size-xl, 20px);
   font-weight: 700;
   color: var(--color-text-primary, #1A1A1A);
 }
 
 .history-search-head {
+  align-items: flex-start;
+}
+
+.history-search-close {
+  flex-shrink: 0;
+}
+
+.history-search-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  margin-top: 14px;
 }
 
 .history-search-clear {
-  border: none;
-  background: transparent;
+  border: 1px solid var(--color-border, #E5E7EB);
+  background: rgba(255, 255, 255, 0.88);
   color: var(--color-primary, #16A34A);
   font-size: var(--font-size-sm, 13px);
   font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 999px;
 }
 
 .history-search-shell {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 14px;
-  padding: 11px 12px;
-  border-radius: 14px;
-  background: var(--color-bg-secondary, #F9FAFB);
+  margin-top: 12px;
 }
 
 .history-search-input {

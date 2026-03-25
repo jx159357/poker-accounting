@@ -15,6 +15,11 @@
     <!-- 表单卡片 -->
     <div class="form-wrapper">
       <div class="form-card">
+        <div class="auth-card-head">
+          <div class="auth-card-title">欢迎回来</div>
+          <div class="auth-card-subtitle">登录后可继续未完成的牌局，并查看完整统计。</div>
+        </div>
+
         <van-form @submit="handleLogin">
           <van-field
             v-model="loginForm.username"
@@ -39,7 +44,7 @@
               type="primary"
               native-type="submit"
               :loading="userStore.loading"
-              class="btn-login"
+              class="btn-login action-btn-primary"
             >
               登录
             </van-button>
@@ -48,7 +53,8 @@
               round
               block
               plain
-              class="btn-register"
+              type="primary"
+              class="btn-register action-btn-secondary"
               @click="goToRegister"
             >
               注册账号
@@ -61,10 +67,11 @@
             <van-button
               round
               block
-              class="btn-guest"
+              plain
+              class="btn-guest action-btn-secondary"
               @click="handleGuestMode"
             >
-              游客模式
+              先以游客体验
             </van-button>
           </div>
         </van-form>
@@ -172,6 +179,23 @@ const handleGuestMode = () => {
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
 }
 
+.auth-card-head {
+  margin-bottom: 18px;
+}
+
+.auth-card-title {
+  font-size: calc(20px * var(--font-scale, 1));
+  font-weight: 700;
+  color: var(--color-text-primary, #1A1A1A);
+}
+
+.auth-card-subtitle {
+  margin-top: 6px;
+  font-size: var(--font-size-sm, 13px);
+  line-height: 1.5;
+  color: var(--color-text-secondary, #6B7280);
+}
+
 .form-actions {
   margin-top: 28px;
   display: flex;
@@ -180,16 +204,12 @@ const handleGuestMode = () => {
 }
 
 .btn-login {
-  height: 44px;
   font-size: calc(16px * var(--font-scale, 1));
   font-weight: 600;
 }
 
 .btn-register {
-  height: 44px;
   font-size: calc(15px * var(--font-scale, 1));
-  color: var(--color-primary, #16A34A) !important;
-  border-color: var(--color-primary, #16A34A) !important;
 }
 
 .divider {
@@ -210,10 +230,6 @@ const handleGuestMode = () => {
 }
 
 .btn-guest {
-  height: 44px;
   font-size: calc(15px * var(--font-scale, 1));
-  color: var(--color-text-secondary, #6B7280) !important;
-  background: var(--color-bg-hover, #F3F4F6) !important;
-  border: none !important;
 }
 </style>

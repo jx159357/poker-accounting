@@ -81,7 +81,7 @@
             <div class="guest-growth-title">{{ guestGrowthTitle }}</div>
             <div class="guest-growth-desc">{{ guestGrowthDescription }}</div>
           </div>
-          <van-button size="small" type="primary" round>去注册</van-button>
+          <span class="guest-growth-cta">立即注册</span>
         </button>
 
         <section class="list-card">
@@ -92,7 +92,7 @@
                 size="small"
                 type="primary"
                 plain
-                class="utility-btn"
+                class="utility-btn action-btn-toolbar"
                 @click="showToolsPopup = true"
               >
                 工具
@@ -101,7 +101,7 @@
                 size="small"
                 type="primary"
                 plain
-                class="utility-btn"
+                class="utility-btn action-btn-toolbar"
                 @click="loadGames"
                 :loading="gameStore.loading"
               >
@@ -122,9 +122,10 @@
                 type="primary"
                 round
                 size="small"
+                class="action-btn-primary"
                 @click="searchKeyword ? searchKeyword = '' : showCreateDialog = true"
               >
-                {{ searchKeyword ? '清除搜索' : '创建第一局' }}
+                {{ searchKeyword ? '清空搜索' : '创建第一局' }}
               </van-button>
             </van-empty>
 
@@ -233,20 +234,23 @@
       position="bottom"
       :style="{ maxHeight: '76%' }"
     >
-      <div class="tools-popup">
-        <div class="tools-head">
+      <div class="tools-popup overlay-panel-surface">
+        <div class="tools-head overlay-panel-head">
           <div>
             <div class="tools-title">扩展工具</div>
             <div class="tools-subtitle">搜索、排序和筛选都放在这里，主界面保持简洁。</div>
           </div>
-          <button type="button" class="tools-close" @click="showToolsPopup = false">
-            <van-icon name="cross" size="18" />
-          </button>
+          <div class="tools-head-side">
+            <span class="overlay-panel-badge">{{ visibleGamesCount }} 条</span>
+            <button type="button" class="tools-close overlay-panel-close" @click="showToolsPopup = false">
+              <van-icon name="cross" size="18" />
+            </button>
+          </div>
         </div>
 
-        <div class="tools-block tools-block-pinned">
+        <div class="tools-block tools-block-pinned overlay-panel-block">
           <div class="tools-label">搜索房间</div>
-          <label class="search-shell">
+          <label class="search-shell overlay-panel-input">
             <van-icon name="search" size="16" color="#94A3B8" />
             <input
               v-model.trim="searchKeyword"
@@ -258,7 +262,7 @@
         </div>
 
         <div class="tools-scroll">
-          <div class="tools-block">
+          <div class="tools-block overlay-panel-block">
             <div class="tools-label">筛选范围</div>
             <div class="filter-row">
               <button
@@ -274,7 +278,7 @@
             </div>
           </div>
 
-          <div class="tools-block">
+          <div class="tools-block overlay-panel-block">
             <div class="tools-label">排序方式</div>
             <div class="sort-row">
               <button
@@ -290,7 +294,7 @@
             </div>
           </div>
 
-          <div class="tools-block">
+          <div class="tools-block overlay-panel-block">
             <div class="tools-label">当前摘要</div>
             <div class="insight-strip">
               <span class="insight-pill">{{ activeFilterDescription }}</span>
@@ -299,8 +303,8 @@
           </div>
         </div>
 
-        <van-button block round plain class="tools-reset" @click="resetTools">
-          恢复默认视图
+        <van-button block round plain class="tools-reset action-btn-secondary" @click="resetTools">
+          重置筛选与排序
         </van-button>
       </div>
     </van-popup>
@@ -840,6 +844,21 @@ onMounted(() => {
   color: rgba(255, 255, 255, 0.84);
 }
 
+.guest-growth-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  font-size: var(--font-size-sm, 13px);
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+}
+
 .list-card {
   background: rgba(255, 255, 255, 0.92);
   border-radius: 20px;
@@ -885,16 +904,17 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   height: min(76vh, 560px);
-  background:
-    radial-gradient(circle at top right, rgba(22, 163, 74, 0.08), transparent 180px),
-    var(--color-bg-white, #fff);
+  border-top: 1px solid var(--color-border, #E5E7EB);
 }
 
 .tools-head {
+  flex-shrink: 0;
+}
+
+.tools-head-side {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
+  align-items: center;
+  gap: 10px;
   flex-shrink: 0;
 }
 
@@ -912,23 +932,11 @@ onMounted(() => {
 }
 
 .tools-close {
-  width: 32px;
-  height: 32px;
-  border: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-  background: rgba(15, 23, 42, 0.06);
   color: var(--color-text-secondary, #6B7280);
-  flex-shrink: 0;
 }
 
 .tools-block {
-  background: rgba(255, 255, 255, 0.88);
-  border-radius: 16px;
   padding: 14px;
-  box-shadow: var(--shadow-sm);
 }
 
 .tools-block-pinned {
@@ -954,12 +962,7 @@ onMounted(() => {
 }
 
 .search-shell {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   padding: 10px 12px;
-  border-radius: 14px;
-  background: var(--color-bg-secondary, #F9FAFB);
 }
 
 .search-input {
@@ -1005,12 +1008,14 @@ onMounted(() => {
   font-size: var(--font-size-xs, 12px);
   color: var(--color-text-secondary, #6B7280);
   white-space: nowrap;
+  box-shadow: var(--shadow-sm);
 }
 
 .sort-chip-active {
-  border-color: rgba(15, 118, 110, 0.24);
-  background: rgba(15, 118, 110, 0.08);
-  color: #0F766E;
+  border-color: var(--color-primary, #16A34A);
+  background: var(--color-primary-bg, rgba(22, 163, 74, 0.08));
+  color: var(--color-primary, #16A34A);
+  box-shadow: 0 0 0 3px var(--color-primary-bg, rgba(22, 163, 74, 0.08));
 }
 
 .insight-strip {

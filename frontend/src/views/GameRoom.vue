@@ -24,7 +24,7 @@
             round
             @click="handleEndGame"
           >
-            结束
+            结束本局
           </van-button>
         </div>
       </template>
@@ -42,7 +42,7 @@
           </div>
           <button class="share-btn" @click="handleShare">
             <van-icon name="share-o" size="16" />
-            <span>分享</span>
+            <span>分享房间</span>
           </button>
         </div>
       </div>
@@ -261,18 +261,28 @@
     <van-popup
       v-model:show="showSettlement"
       round
-      closeable
       position="bottom"
       :style="{ maxHeight: '70%' }"
       @closed="onSettlementClosed"
     >
-      <div class="settlement-popup">
-        <h3 class="settlement-title">游戏结算</h3>
+      <div class="settlement-popup overlay-panel-surface">
+        <div class="settlement-head overlay-panel-head">
+          <div>
+            <h3 class="settlement-title">游戏结算</h3>
+            <div class="settlement-subtitle">按当前净分排序，方便快速确认本局结果。</div>
+          </div>
+          <div class="settlement-head-side">
+            <span class="overlay-panel-badge">{{ settlementPlayers.length }} 人</span>
+            <button type="button" class="settlement-close overlay-panel-close" @click="showSettlement = false">
+              <van-icon name="cross" size="18" />
+            </button>
+          </div>
+        </div>
         <div class="settlement-list">
           <div
             v-for="(player, index) in settlementPlayers"
             :key="player.id"
-            class="settlement-item"
+            class="settlement-item overlay-panel-block"
           >
             <div class="settlement-rank">{{ index + 1 }}</div>
             <div
@@ -321,7 +331,7 @@
           <p class="text-sm text-gray-400 mt-2">
             类型: {{ game?.gameType || '其他' }} · 玩家: {{ game?.players?.length || 0 }}人
           </p>
-          <p class="text-sm text-gray-500 mt-2">是否加入该房间?</p>
+          <p class="text-sm text-gray-500 mt-2">是否加入这个房间？</p>
         </template>
       </div>
     </van-dialog>
@@ -1054,12 +1064,34 @@ onUnmounted(() => {
   padding: 24px 20px 32px;
 }
 
+.settlement-head {
+  align-items: flex-start;
+  margin-bottom: 20px;
+}
+
+.settlement-head-side {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.settlement-close {
+  flex-shrink: 0;
+}
+
 .settlement-title {
   font-size: var(--font-size-xl, 20px);
   font-weight: 700;
   color: var(--color-text-primary, #1A1A1A);
-  text-align: center;
-  margin: 0 0 20px;
+  margin: 0;
+}
+
+.settlement-subtitle {
+  margin-top: 6px;
+  font-size: var(--font-size-sm, 13px);
+  line-height: 1.5;
+  color: var(--color-text-secondary, #6B7280);
 }
 
 .settlement-list {
@@ -1073,8 +1105,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 12px;
   padding: 12px;
-  background: var(--color-bg-secondary, #F9FAFB);
-  border-radius: 10px;
+  border-radius: 14px;
 }
 
 .settlement-rank {
