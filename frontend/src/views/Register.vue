@@ -141,7 +141,7 @@ const handleBack = () => {
 }
 
 .card-symbol {
-  font-size: 28px;
+  font-size: calc(28px * var(--font-scale, 1));
   color: rgba(255, 255, 255, 0.9);
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
@@ -151,7 +151,7 @@ const handleBack = () => {
 }
 
 .brand-title {
-  font-size: 24px;
+  font-size: calc(24px * var(--font-scale, 1));
   font-weight: 700;
   color: #fff;
   margin: 0;
@@ -159,7 +159,7 @@ const handleBack = () => {
 }
 
 .brand-subtitle {
-  font-size: 14px;
+  font-size: calc(14px * var(--font-scale, 1));
   color: rgba(255, 255, 255, 0.8);
   margin: 8px 0 0;
 }
@@ -188,13 +188,13 @@ const handleBack = () => {
 
 .btn-register {
   height: 44px;
-  font-size: 16px;
+  font-size: calc(16px * var(--font-scale, 1));
   font-weight: 600;
 }
 
 .btn-back {
   height: 44px;
-  font-size: 15px;
+  font-size: calc(15px * var(--font-scale, 1));
   color: var(--color-text-secondary, #6B7280) !important;
   border-color: #D1D5DB !important;
 }

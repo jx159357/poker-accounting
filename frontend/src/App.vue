@@ -21,15 +21,22 @@
       <van-tabbar-item icon="chart-trending-o" to="/statistics">统计</van-tabbar-item>
       <van-tabbar-item icon="user-o" to="/profile">我的</van-tabbar-item>
     </van-tabbar>
+
+    <SettingsDrawer />
   </div>
 </template>
 
 <script setup>
 import { ref, computed } from 'vue'
 import { useRoute } from 'vue-router'
+import SettingsDrawer from './components/SettingsDrawer.vue'
+import { useSettingsStore } from './stores/settings'
 
 const route = useRoute()
 const activeTab = ref(0)
+const settingsStore = useSettingsStore()
+
+settingsStore.init()
 
 // 只在这些页面显示底部导航
 const tabbarPages = ['/home', '/history', '/statistics', '/profile']
@@ -62,7 +69,7 @@ const showTabbar = computed(() => {
 }
 
 .app-tabbar :deep(.van-tabbar-item__icon) {
-  font-size: 22px;
+  font-size: calc(22px * var(--font-scale, 1));
   margin-bottom: 2px;
 }
 </style>

@@ -14,6 +14,12 @@ import { GameRecord } from '../entities/game-record.entity';
 import { User } from '../entities/user.entity';
 import { AchievementService } from './achievement.service';
 
+type AuthenticatedUser = {
+  userId: number;
+  username: string;
+  nickname?: string;
+} | null | undefined;
+
 @Injectable()
 export class GameService {
   private readonly logger = new Logger(GameService.name);
@@ -41,16 +47,25 @@ export class GameService {
     'gameRecords.toPlayer.user',
   ];
 
-  // 生成唯一房间号（重试机制，确保活跃房间不重复）
+  // 生成唯一房间号（重试机制，确保全表唯一）
   private async generateUniqueRoomCode(): Promise<string> {
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 20; i++) {
       const code = Math.random().toString(36).substring(2, 8).toUpperCase();
       const existing = await this.gameRepository.findOne({
-        where: { roomCode: code, status: 'active' },
+        where: { roomCode: code },
       });
       if (!existing) return code;
     }
-    return Math.random().toString(36).substring(2, 10).toUpperCase();
+
+    for (let i = 0; i < 10; i++) {
+      const fallbackCode = Math.random().toString(36).substring(2, 10).toUpperCase();
+      const existing = await this.gameRepository.findOne({
+        where: { roomCode: fallbackCode },
+      });
+      if (!existing) return fallbackCode;
+    }
+
+    throw new BadRequestException('房间号生成失败，请稍后重试');
   }
 
   // 从前端标识 "user_username" 解析为数据库 userId
@@ -71,6 +86,111 @@ export class GameService {
       return `user_${player.user.username}`;
     }
     return player.guestId || '';
+  }
+
+  private getAuthenticatedRequesterId(authUser?: AuthenticatedUser): string {
+    if (!authUser?.username) return '';
+    return `user_${authUser.username}`;
+  }
+
+  private async normalizeActor(
+    playerId: string,
+    playerType: string,
+    authUser?: AuthenticatedUser,
+  ): Promise<{ playerId: string; playerType: 'user' | 'guest' }> {
+    if (authUser?.userId) {
+      return {
+        playerId: this.getAuthenticatedRequesterId(authUser),
+        playerType: 'user',
+      };
+    }
+
+    if (!playerId || !playerType) {
+      throw new BadRequestException('请提供玩家身份信息');
+    }
+
+    if (playerType === 'user') {
+      throw new ForbiddenException('登录后才能以注册用户身份操作');
+    }
+
+    return {
+      playerId,
+      playerType: 'guest',
+    };
+  }
+
+  private assertPlayerCanAct(
+    player: Pick<GamePlayer, 'userId' | 'guestId'>,
+    authUser?: AuthenticatedUser,
+    requesterId?: string,
+  ): void {
+    if (player.userId) {
+      if (!authUser?.userId) {
+        throw new ForbiddenException('登录后才能操作注册用户数据');
+      }
+      if (player.userId !== authUser.userId) {
+        throw new ForbiddenException('无权操作该玩家');
+      }
+      return;
+    }
+
+    if (!requesterId || player.guestId !== requesterId) {
+      throw new ForbiddenException('无权操作该玩家');
+    }
+  }
+
+  private assertCanManageGame(
+    game: Pick<Game, 'userId' | 'guestId'>,
+    authUser?: AuthenticatedUser,
+    requesterId?: string,
+  ): void {
+    if (game.userId) {
+      if (!authUser?.userId) {
+        throw new ForbiddenException('登录后才能操作该房间');
+      }
+      if (game.userId !== authUser.userId) {
+        throw new ForbiddenException('只有创建者可以操作房间');
+      }
+      return;
+    }
+
+    if (!requesterId || game.guestId !== requesterId) {
+      throw new ForbiddenException('只有创建者可以操作房间');
+    }
+  }
+
+  // 为统计场景提供稳定的玩家标识，避免同名玩家被错误合并
+  private getStatsPlayerIdentifier(player: {
+    id?: number;
+    name?: string;
+    userId?: number;
+    guestId?: string;
+    user?: { username?: string };
+  }): string {
+    const identifier = this.getPlayerIdentifier(player);
+    if (identifier) return identifier;
+    if (player.id) return `player_${player.id}`;
+    return player.name ? `name_${player.name}` : 'unknown';
+  }
+
+  // 计算我与某个对手在单局中的直接净输赢
+  private getHeadToHeadNetScore(
+    myPlayerId: number,
+    opponentPlayerId: number,
+    gameRecords: GameRecord[] = [],
+  ): number {
+    const netScore = gameRecords.reduce((sum, record) => {
+      const amount = Number(record.amount);
+      if (record.fromPlayer?.id === myPlayerId && record.toPlayer?.id === opponentPlayerId) {
+        return sum - amount;
+      }
+      if (record.fromPlayer?.id === opponentPlayerId && record.toPlayer?.id === myPlayerId) {
+        return sum + amount;
+      }
+      return sum;
+    }, 0);
+
+    return Number(netScore.toFixed(2));
   }
 
   // 映射 Player 实体为安全的响应对象（去掉 game 循环引用、去掉密码）
@@ -129,11 +249,14 @@ export class GameService {
     creatorId: string,
     creatorType: string,
     nickname: string,
+    authUser?: AuthenticatedUser,
   ): Promise<any> {
+    const actor = await this.normalizeActor(creatorId, creatorType, authUser);
+
     // 游客房间数量限制（仅限创建的房间）
-    if (creatorType === 'guest') {
+    if (actor.playerType === 'guest') {
       const activeGuestGames = await this.gameRepository.count({
-        where: { guestId: creatorId, status: 'active' },
+        where: { guestId: actor.playerId, status: 'active' },
       });
       if (activeGuestGames >= 3) {
         throw new BadRequestException('GUEST_LIMIT_REACHED');
@@ -148,14 +271,15 @@ export class GameService {
     game.roomCode = roomCode;
     game.status = 'active';
 
-    if (creatorType === 'user') {
-      const userId = await this.resolveUserId(creatorId);
+    if (actor.playerType === 'user') {
+      const userId =
+        authUser?.userId || (await this.resolveUserId(actor.playerId));
       if (!userId) {
         throw new BadRequestException('用户不存在');
       }
       game.userId = userId;
     } else {
-      game.guestId = creatorId;
+      game.guestId = actor.playerId;
     }
 
     const savedGame = await this.gameRepository.save(game);
@@ -166,10 +290,10 @@ export class GameService {
     player.name = nickname;
     player.balance = 0;
 
-    if (creatorType === 'user') {
+    if (actor.playerType === 'user') {
       player.userId = game.userId;
     } else {
-      player.guestId = creatorId;
+      player.guestId = actor.playerId;
     }
 
     await this.playerRepository.save(player);
@@ -188,7 +312,10 @@ export class GameService {
     nickname: string,
     playerId: string,
     playerType: string,
+    authUser?: AuthenticatedUser,
   ): Promise<any> {
+    const actor = await this.normalizeActor(playerId, playerType, authUser);
+
     const game = await this.gameRepository.findOne({
       where: { roomCode },
       relations: this.gameRelations,
@@ -205,7 +332,7 @@ export class GameService {
     // 检查是否已加入（使用与前端一致的标识格式）
     const existingPlayer = game.players.find((p) => {
       const identifier = this.getPlayerIdentifier(p);
-      return identifier === playerId;
+      return identifier === actor.playerId;
     });
 
     if (existingPlayer) {
@@ -218,14 +345,15 @@ export class GameService {
     player.name = nickname;
     player.balance = 0;
 
-    if (playerType === 'user') {
-      const userId = await this.resolveUserId(playerId);
+    if (actor.playerType === 'user') {
+      const userId =
+        authUser?.userId || (await this.resolveUserId(actor.playerId));
       if (!userId) {
         throw new BadRequestException('用户不存在');
       }
       player.userId = userId;
     } else {
-      player.guestId = playerId;
+      player.guestId = actor.playerId;
     }
 
     await this.playerRepository.save(player);
@@ -261,21 +389,33 @@ export class GameService {
   async getMyGames(
     playerId: string,
     playerType: string,
-    filters?: { gameType?: string; status?: string },
+    filters?: { gameType?: string; status?: string; recentDays?: number; limit?: number },
+    authUser?: AuthenticatedUser,
   ): Promise<any[]> {
-    if (!playerId || !playerType) {
+    if (!playerId && !authUser?.userId) {
       return [];
     }
 
     try {
       const baseWhere: any = {};
+      const actor = await this.normalizeActor(playerId, playerType, authUser);
+      const recentDays =
+        typeof filters?.recentDays === 'number' && filters.recentDays > 0
+          ? filters.recentDays
+          : actor.playerType === 'guest'
+            ? 7
+            : 30;
+      const recentThreshold = new Date(
+        Date.now() - recentDays * 24 * 60 * 60 * 1000,
+      );
 
-      if (playerType === 'user') {
-        const userId = await this.resolveUserId(playerId);
+      if (actor.playerType === 'user') {
+        const userId =
+          authUser?.userId || (await this.resolveUserId(actor.playerId));
         if (!userId) return [];
         baseWhere.userId = userId;
       } else {
-        baseWhere.guestId = playerId;
+        baseWhere.guestId = actor.playerId;
       }
 
       let players = await this.playerRepository.find({
@@ -288,23 +428,45 @@ export class GameService {
         },
       });
 
-      // 游客只返回 7 天内的记录
-      if (playerType === 'guest') {
-        const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-        players = players.filter(
-          (p) => new Date(p.game.createdAt) >= sevenDaysAgo,
-        );
-      }
-
       // 按筛选条件过滤
       if (filters?.gameType) {
         players = players.filter(p => p.game.gameType === filters.gameType);
       }
-      if (filters?.status) {
-        players = players.filter(p => p.game.status === filters.status);
+
+      if (filters?.status === 'active') {
+        players = players.filter((p) => p.game.status === 'active');
+      } else if (filters?.status === 'ended') {
+        players = players.filter(
+          (p) =>
+            p.game.status === 'ended' &&
+            new Date(p.game.createdAt) >= recentThreshold,
+        );
+      } else {
+        players = players.filter(
+          (p) =>
+            p.game.status === 'active' ||
+            new Date(p.game.createdAt) >= recentThreshold,
+        );
       }
 
-      return players.map((player) => ({
+      players.sort((a, b) => {
+        if (a.game.status !== b.game.status) {
+          return a.game.status === 'active' ? -1 : 1;
+        }
+        return (
+          new Date(b.game.createdAt).getTime() -
+          new Date(a.game.createdAt).getTime()
+        );
+      });
+
+      const limit =
+        typeof filters?.limit === 'number' && filters.limit > 0
+          ? filters.limit
+          : actor.playerType === 'guest'
+            ? 40
+            : 80;
+
+      return players.slice(0, limit).map((player) => ({
         id: player.game.id,
         name: player.game.name,
         roomCode: player.game.roomCode,
@@ -327,6 +489,8 @@ export class GameService {
     toPlayerId: number,
     score: number,
     note?: string,
+    requesterId?: string,
+    authUser?: AuthenticatedUser,
   ): Promise<GameRecord> {
     const game = await this.gameRepository.findOne({
       where: { roomCode },
@@ -352,6 +516,13 @@ export class GameService {
     if (!fromPlayer || !toPlayer) {
       throw new NotFoundException('玩家不存在');
     }
+
+    const gamePlayerIds = new Set(game.players.map((player) => player.id));
+    if (!gamePlayerIds.has(fromPlayerId) || !gamePlayerIds.has(toPlayerId)) {
+      throw new BadRequestException('玩家不在当前房间中');
+    }
+
+    this.assertPlayerCanAct(fromPlayer, authUser, requesterId);
 
     if (fromPlayerId === toPlayerId) {
       throw new BadRequestException('不能给自己转分');
@@ -382,6 +553,7 @@ export class GameService {
     roomCode: string,
     recordId: number,
     requesterId: string,
+    authUser?: AuthenticatedUser,
   ): Promise<void> {
     const game = await this.gameRepository.findOne({
       where: { roomCode },
@@ -405,11 +577,7 @@ export class GameService {
       throw new NotFoundException('记录不存在');
     }
 
-    // 只有给分者可以撤销（使用与前端一致的标识格式比较）
-    const fromPlayerIdentifier = this.getPlayerIdentifier(record.fromPlayer);
-    if (fromPlayerIdentifier !== requesterId) {
-      throw new BadRequestException('只有给分者可以撤销记录');
-    }
+    this.assertPlayerCanAct(record.fromPlayer, authUser, requesterId);
 
     record.fromPlayer.balance =
       Number(record.fromPlayer.balance) + Number(record.amount);
@@ -425,6 +593,8 @@ export class GameService {
     roomCode: string,
     playerId: number,
     newNickname: string,
+    requesterId?: string,
+    authUser?: AuthenticatedUser,
   ): Promise<GamePlayer> {
     const game = await this.gameRepository.findOne({
       where: { roomCode },
@@ -441,6 +611,8 @@ export class GameService {
       throw new NotFoundException('玩家不存在');
     }
 
+    this.assertPlayerCanAct(player, authUser, requesterId);
+
     player.name = newNickname;
     await this.playerRepository.save(player);
 
@@ -448,7 +620,11 @@ export class GameService {
   }
 
   // 结束游戏
-  async endGame(roomCode: string): Promise<any> {
+  async endGame(
+    roomCode: string,
+    requesterId?: string,
+    authUser?: AuthenticatedUser,
+  ): Promise<any> {
     const game = await this.gameRepository.findOne({
       where: { roomCode },
       relations: ['players'],
@@ -457,6 +633,8 @@ export class GameService {
     if (!game) {
       throw new NotFoundException('房间不存在');
     }
+
+    this.assertCanManageGame(game, authUser, requesterId);
 
     game.status = 'ended';
     await this.gameRepository.save(game);
@@ -487,7 +665,11 @@ export class GameService {
   }
 
   // 删除游戏
-  async deleteGame(roomCode: string, requesterId: string): Promise<void> {
+  async deleteGame(
+    roomCode: string,
+    requesterId?: string,
+    authUser?: AuthenticatedUser,
+  ): Promise<void> {
     const game = await this.gameRepository.findOne({
       where: { roomCode },
     });
@@ -496,20 +678,7 @@ export class GameService {
       throw new NotFoundException('房间不存在');
     }
 
-    // 构建创建者标识，使用与前端一致的格式比较
-    let creatorIdentifier: string;
-    if (game.userId) {
-      const creator = await this.userRepository.findOne({
-        where: { id: game.userId },
-      });
-      creatorIdentifier = creator ? `user_${creator.username}` : '';
-    } else {
-      creatorIdentifier = game.guestId || '';
-    }
-
-    if (creatorIdentifier !== requesterId) {
-      throw new BadRequestException('只有创建者可以删除房间');
-    }
+    this.assertCanManageGame(game, authUser, requesterId);
 
     await this.gameRepository.remove(game);
   }
@@ -797,49 +966,103 @@ export class GameService {
       // 查找我参与的所有已结束游戏
       const myPlayers = await this.playerRepository.find({
         where: userId ? { userId } : { guestId },
-        relations: ['game', 'game.players', 'game.players.user'],
+        relations: [
+          'game',
+          'game.players',
+          'game.players.user',
+          'game.gameRecords',
+          'game.gameRecords.fromPlayer',
+          'game.gameRecords.toPlayer',
+        ],
       });
 
-      const endedPlayers = myPlayers.filter(p => p.game.status === 'ended');
+      let endedPlayers = myPlayers.filter(p => p.game.status === 'ended');
+
+      if (playerType === 'guest') {
+        const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+        endedPlayers = endedPlayers.filter(
+          (p) => new Date(p.game.createdAt) >= sevenDaysAgo,
+        );
+      }
 
       // 聚合对手数据
       const opponentMap = new Map<string, {
+        opponentId: string;
         opponentName: string;
+        opponentType: 'user' | 'guest';
         gamesPlayed: number;
         myWins: number;
         myLosses: number;
+        myDraws: number;
         myNetScore: number;
+        avgNetScore: number;
+        recentPlayedAt: Date | null;
       }>();
 
       for (const myPlayer of endedPlayers) {
-        const myBalance = Number(myPlayer.balance);
-        const myIdentifier = userId ? `user_${myPlayer.user?.username || ''}` : myPlayer.guestId;
-
         for (const opponent of myPlayer.game.players) {
-          const oppIdentifier = this.getPlayerIdentifier(opponent);
-          if (oppIdentifier === myIdentifier || oppIdentifier === playerId) continue;
+          if (opponent.id === myPlayer.id) continue;
 
-          const key = oppIdentifier || opponent.name;
+          const key = this.getStatsPlayerIdentifier(opponent);
+          const gameNetScore = this.getHeadToHeadNetScore(
+            myPlayer.id,
+            opponent.id,
+            myPlayer.game.gameRecords,
+          );
+
+          const opponentName =
+            opponent.user?.nickname || opponent.user?.username || opponent.name;
+
           if (!opponentMap.has(key)) {
             opponentMap.set(key, {
-              opponentName: opponent.name,
+              opponentId: key,
+              opponentName,
+              opponentType: opponent.userId ? 'user' : 'guest',
               gamesPlayed: 0,
               myWins: 0,
               myLosses: 0,
+              myDraws: 0,
               myNetScore: 0,
+              avgNetScore: 0,
+              recentPlayedAt: null,
             });
           }
 
           const stat = opponentMap.get(key)!;
           stat.gamesPlayed++;
-          if (myBalance > 0) stat.myWins++;
-          if (myBalance < 0) stat.myLosses++;
-          stat.myNetScore += myBalance;
+          if (gameNetScore > 0) stat.myWins++;
+          else if (gameNetScore < 0) stat.myLosses++;
+          else stat.myDraws++;
+
+          stat.myNetScore = Number((stat.myNetScore + gameNetScore).toFixed(2));
+          stat.avgNetScore = Number(
+            (stat.myNetScore / stat.gamesPlayed).toFixed(1),
+          );
+
+          if (
+            !stat.recentPlayedAt ||
+            new Date(myPlayer.game.createdAt).getTime() >
+              new Date(stat.recentPlayedAt).getTime()
+          ) {
+            stat.recentPlayedAt = myPlayer.game.createdAt;
+            stat.opponentName = opponentName;
+          }
         }
       }
 
       return Array.from(opponentMap.values())
-        .sort((a, b) => b.gamesPlayed - a.gamesPlayed);
+        .sort((a, b) => {
+          if (b.gamesPlayed !== a.gamesPlayed) {
+            return b.gamesPlayed - a.gamesPlayed;
+          }
+          if (b.myNetScore !== a.myNetScore) {
+            return b.myNetScore - a.myNetScore;
+          }
+          return (
+            new Date(b.recentPlayedAt || 0).getTime() -
+            new Date(a.recentPlayedAt || 0).getTime()
+          );
+        });
     } catch (error) {
       console.error('Error in getOpponentStats:', error);
       return [];

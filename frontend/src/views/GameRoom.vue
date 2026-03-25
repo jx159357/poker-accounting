@@ -6,7 +6,7 @@
       left-arrow
       fixed
       placeholder
-      @click-left="router.push('/home')"
+      @click-left="handleBack"
     >
       <template #right>
         <div class="nav-right-actions">
@@ -94,6 +94,22 @@
                 </span>
               </div>
             </div>
+            <button
+              v-if="game.status === 'active'"
+              type="button"
+              class="player-card invite-player-card"
+              @click="showInvitePopup = true"
+            >
+              <div class="player-content">
+                <div class="invite-avatar">
+                  <van-icon name="plus" size="24" />
+                </div>
+                <div class="player-info">
+                  <div class="player-name invite-name">邀请加入</div>
+                  <div class="invite-desc">生成二维码</div>
+                </div>
+              </div>
+            </button>
           </div>
         </div>
       </div>
@@ -279,6 +295,11 @@
 
     <!-- 游客注册提示 -->
     <RegisterPrompt v-model:visible="showRegisterPrompt" source="game-end" />
+    <RoomInvitePopup
+      v-model:show="showInvitePopup"
+      :room-code="game?.roomCode"
+      :room-name="game?.name"
+    />
 
     <!-- 非玩家加入提示弹窗 -->
     <van-dialog
@@ -286,9 +307,9 @@
       :title="roomEnded ? '房间已结束' : '加入房间'"
       :show-cancel-button="true"
       :confirm-button-text="roomEnded ? '查看记录' : '加入房间'"
-      cancel-button-text="返回首页"
+      cancel-button-text="返回上一页"
       @confirm="handleJoinRoom"
-      @cancel="router.push('/home')"
+      @cancel="handleBack"
     >
       <div class="p-4 text-center">
         <template v-if="roomEnded">
@@ -314,7 +335,10 @@ import { useGameStore } from '../stores/game';
 import { useUserStore } from '../stores/user';
 import { showToast, showConfirmDialog } from 'vant';
 import RegisterPrompt from '../components/RegisterPrompt.vue';
+import RoomInvitePopup from '../components/RoomInvitePopup.vue';
 import { getSelectableTypes } from '../config/gameTypes';
+import { buildRoomShareText, buildRoomShareUrl } from '../utils/roomInvite';
+import { goBackWithFallback } from '../utils/navigation';
 
 const route = useRoute();
 const router = useRouter();
@@ -322,6 +346,7 @@ const gameStore = useGameStore();
 const userStore = useUserStore();
 
 const roomCode = route.params.roomCode;
+const rawFrom = Array.isArray(route.query.from) ? route.query.from[0] : route.query.from;
 const showScoreDialog = ref(false);
 const showEditNicknameDialog = ref(false);
 const selectedPlayer = ref(null);
@@ -343,26 +368,30 @@ const showSettlement = ref(false);
 const showRegisterPrompt = ref(false);
 const showJoinPrompt = ref(false);
 const roomEnded = ref(false);
+const showInvitePopup = ref(false);
 let previousStatus = null;
 
+const AUTO_REFRESH_INTERVAL = 6000;
 let refreshInterval = null;
+let isRefreshingRoom = false;
+let hasCheckedJoin = false;
 
 // 页面可见性变化：暂停/恢复轮询
 const handleVisibilityChange = () => {
   if (document.hidden) {
-    if (refreshInterval) {
-      clearInterval(refreshInterval);
-      refreshInterval = null;
-    }
+    stopAutoRefresh();
   } else {
-    loadGame();
-    refreshInterval = setInterval(() => {
-      loadGame();
-    }, 5000);
+    loadGame({ silent: true });
   }
 };
 
 const game = computed(() => gameStore.currentGame);
+const shareUrl = computed(() => buildRoomShareUrl(game.value?.roomCode));
+const shareText = computed(() => buildRoomShareText(game.value?.name, game.value?.roomCode));
+const backTarget = computed(() => {
+  const allowedTargets = new Set(['/home', '/history', '/statistics']);
+  return allowedTargets.has(rawFrom) ? rawFrom : '/home';
+});
 
 const sortedPlayers = computed(() => {
   if (!game.value?.players) return [];
@@ -487,16 +516,12 @@ const formatDateTime = (dateString) => {
 };
 
 const handleShare = () => {
-  const code = game.value.roomCode;
-  const shareUrl = `${window.location.origin}/room/${code}`;
-  const shareText = `来打牌！房间: ${game.value.name || ''}，房间号: ${code}`;
-
   // 优先使用 Web Share API
   if (navigator.share) {
     navigator.share({
       title: game.value.name || '打牌记账',
-      text: shareText,
-      url: shareUrl,
+      text: shareText.value,
+      url: shareUrl.value,
     }).catch(() => {
       // 用户取消分享，静默处理
     });
@@ -504,7 +529,7 @@ const handleShare = () => {
   }
 
   // 降级: 复制完整 URL
-  const copyText = `${shareText}\n${shareUrl}`;
+  const copyText = `${shareText.value}\n${shareUrl.value}`;
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(copyText)
       .then(() => {
@@ -534,6 +559,10 @@ const fallbackCopyText = (text) => {
   }
 
   document.body.removeChild(textArea);
+};
+
+const handleBack = () => {
+  goBackWithFallback(router, backTarget.value);
 };
 
 const handlePlayerClick = (player) => {
@@ -670,7 +699,7 @@ const handleDeleteGame = async () => {
     });
     await gameStore.deleteGame(roomCode);
     showToast('已删除');
-    router.push('/home');
+    handleBack();
   } catch (error) {
     if (error !== 'cancel') {
       showToast(error.message || '删除失败');
@@ -689,6 +718,12 @@ watch(() => game.value?.status, (newStatus, oldStatus) => {
   if (oldStatus === 'active' && newStatus === 'ended') {
     showSettlement.value = true;
   }
+
+  if (newStatus === 'active') {
+    startAutoRefresh();
+  } else {
+    stopAutoRefresh();
+  }
 });
 
 watch(showEditGameDialog, (val) => {
@@ -701,22 +736,46 @@ watch(showEditGameDialog, (val) => {
   }
 });
 
-const loadGame = async () => {
+const startAutoRefresh = () => {
+  if (document.hidden || refreshInterval || game.value?.status !== 'active') return
+
+  refreshInterval = setInterval(() => {
+    loadGame({ silent: true })
+  }, AUTO_REFRESH_INTERVAL)
+}
+
+const stopAutoRefresh = () => {
+  if (refreshInterval) {
+    clearInterval(refreshInterval)
+    refreshInterval = null
+  }
+}
+
+const loadGame = async ({ silent = false } = {}) => {
+  if (isRefreshingRoom) return
+
+  isRefreshingRoom = true
   try {
-    await gameStore.getGameDetail(roomCode);
+    await gameStore.getGameDetail(roomCode, { silent, from: backTarget.value });
     // 首次加载时检查是否为房间玩家
     if (!showJoinPrompt.value && !isPlayerInGame.value && !hasCheckedJoin) {
       hasCheckedJoin = true;
       roomEnded.value = game.value.status !== 'active';
       showJoinPrompt.value = true;
     }
+
+    if (game.value?.status === 'active') {
+      startAutoRefresh();
+    } else {
+      stopAutoRefresh();
+    }
   } catch (error) {
     showToast(error.message || '加载失败');
-    router.push('/home');
+    handleBack();
+  } finally {
+    isRefreshingRoom = false
   }
 };
-
-let hasCheckedJoin = false;
 
 const handleJoinRoom = async () => {
   if (roomEnded.value) {
@@ -735,18 +794,11 @@ const handleJoinRoom = async () => {
 onMounted(() => {
   loadGame();
 
-  // 每5秒自动刷新
-  refreshInterval = setInterval(() => {
-    loadGame();
-  }, 5000);
-
   document.addEventListener('visibilitychange', handleVisibilityChange);
 });
 
 onUnmounted(() => {
-  if (refreshInterval) {
-    clearInterval(refreshInterval);
-  }
+  stopAutoRefresh();
   document.removeEventListener('visibilitychange', handleVisibilityChange);
 });
 </script>
@@ -760,12 +812,12 @@ onUnmounted(() => {
 }
 
 .room-label {
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale, 1));
   opacity: 0.85;
 }
 
 .room-code {
-  font-size: 22px;
+  font-size: calc(22px * var(--font-scale, 1));
   font-weight: 700;
   margin-top: 2px;
   letter-spacing: 1px;
@@ -780,7 +832,7 @@ onUnmounted(() => {
   border-radius: 20px;
   padding: 6px 14px;
   color: #fff;
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale, 1));
   cursor: pointer;
   transition: background 0.15s ease;
 }
@@ -797,7 +849,7 @@ onUnmounted(() => {
 
 .player-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -814,6 +866,12 @@ onUnmounted(() => {
   transform: scale(0.95);
 }
 
+.invite-player-card {
+  border: 1px dashed rgba(22, 163, 74, 0.24);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(240, 253, 244, 0.96));
+}
+
 .player-content {
   display: flex;
   flex-direction: column;
@@ -828,9 +886,21 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   color: #fff;
-  font-size: 18px;
+  font-size: calc(18px * var(--font-scale, 1));
   font-weight: 700;
   box-shadow: var(--shadow-sm);
+}
+
+.invite-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-primary, #16A34A);
+  background: var(--color-primary-bg, rgba(22, 163, 74, 0.08));
+  box-shadow: inset 0 0 0 1px rgba(22, 163, 74, 0.12);
 }
 
 .player-info {
@@ -849,9 +919,19 @@ onUnmounted(() => {
 }
 
 .player-score {
-  font-size: 15px;
+  font-size: calc(15px * var(--font-scale, 1));
   font-weight: 700;
   margin-top: 2px;
+}
+
+.invite-name {
+  color: var(--color-primary, #16A34A);
+}
+
+.invite-desc {
+  margin-top: 3px;
+  font-size: calc(11px * var(--font-scale, 1));
+  color: var(--color-text-placeholder, #9CA3AF);
 }
 
 .score-positive {
@@ -889,7 +969,7 @@ onUnmounted(() => {
 }
 
 .divider-time {
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale, 1));
   color: var(--color-text-placeholder, #9CA3AF);
   background: var(--color-bg, #F0F2F5);
   padding: 2px 10px;
@@ -907,6 +987,8 @@ onUnmounted(() => {
   border-radius: 10px;
   padding: 10px 12px;
   box-shadow: var(--shadow-sm);
+  content-visibility: auto;
+  contain-intrinsic-size: 86px;
 }
 
 .record-main {
@@ -919,7 +1001,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale, 1));
 }
 
 .record-player {
@@ -1022,14 +1104,14 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   color: #fff;
-  font-size: 15px;
+  font-size: calc(15px * var(--font-scale, 1));
   font-weight: 700;
   flex-shrink: 0;
 }
 
 .settlement-name {
   flex: 1;
-  font-size: 15px;
+  font-size: calc(15px * var(--font-scale, 1));
   font-weight: 600;
   color: var(--color-text-tertiary, #374151);
   overflow: hidden;
@@ -1038,13 +1120,13 @@ onUnmounted(() => {
 }
 
 .settlement-score {
-  font-size: 18px;
+  font-size: calc(18px * var(--font-scale, 1));
   font-weight: 700;
   flex-shrink: 0;
 }
 
 .rename-link {
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale, 1));
   color: var(--color-primary, #16A34A);
   cursor: pointer;
   margin-top: 4px;

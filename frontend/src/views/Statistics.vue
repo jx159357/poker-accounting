@@ -1,6 +1,6 @@
 <template>
   <div class="h-full flex flex-col bg-gray-50 overflow-hidden">
-    <van-nav-bar title="数据统计" left-arrow @click-left="router.back()" />
+    <van-nav-bar title="数据统计" left-arrow @click-left="handleBack" />
 
     <van-loading v-if="loading" class="flex-1 flex items-center justify-center" />
 
@@ -103,11 +103,14 @@
             </div>
             <div v-if="expanded.opponents" class="section-body">
               <div class="type-list">
-                <div v-for="opp in opponents.slice(0, 10)" :key="opp.opponentName" class="type-item">
+                <div v-for="opp in opponents.slice(0, 10)" :key="opp.opponentId" class="type-item">
                   <div class="type-info">
                     <div class="type-name">{{ opp.opponentName }}</div>
                     <div class="type-meta">
-                      {{ opp.gamesPlayed }} 场 · 胜 {{ opp.myWins }} · 负 {{ opp.myLosses }}
+                      {{ opp.gamesPlayed }} 场 · 胜 {{ opp.myWins }} · 负 {{ opp.myLosses }} · 平 {{ opp.myDraws }}
+                    </div>
+                    <div v-if="opp.recentPlayedAt" class="type-meta">
+                      最近 {{ formatDate(opp.recentPlayedAt) }} · 场均 {{ formatSignedScore(opp.avgNetScore) }}
                     </div>
                   </div>
                   <span :class="['score-badge-sm', opp.myNetScore >= 0 ? 'score-badge-positive' : 'score-badge-negative']">
@@ -285,6 +288,7 @@ import { useUserStore } from '../stores/user';
 import { authApi } from '../api/auth';
 import { showToast } from 'vant';
 import RegisterPrompt from '../components/RegisterPrompt.vue';
+import { goBackWithFallback, navigateToRoom } from '../utils/navigation';
 
 const router = useRouter();
 const gameStore = useGameStore();
@@ -318,8 +322,17 @@ const formatDate = (dateString) => {
   });
 };
 
+const formatSignedScore = (score) => {
+  const numericScore = Number(score || 0);
+  return `${numericScore >= 0 ? '+' : ''}${numericScore}`;
+};
+
+const handleBack = () => {
+  goBackWithFallback(router, '/home');
+};
+
 const goToRoom = (roomCode) => {
-  router.push(`/room/${roomCode}`);
+  navigateToRoom(router, roomCode, '/statistics');
 };
 
 const exportCSV = () => {
@@ -398,7 +411,7 @@ onMounted(() => {
 }
 
 .stats-bar-value {
-  font-size: 16px;
+  font-size: calc(16px * var(--font-scale, 1));
   font-weight: 700;
 }
 
@@ -448,7 +461,7 @@ onMounted(() => {
 
 /* 个人记录 */
 .record-value {
-  font-size: 15px;
+  font-size: calc(15px * var(--font-scale, 1));
   font-weight: 600;
   color: var(--color-text-tertiary, #374151);
   flex-shrink: 0;
@@ -557,7 +570,7 @@ onMounted(() => {
 }
 
 .achievement-row-icon {
-  font-size: 20px;
+  font-size: calc(20px * var(--font-scale, 1));
   margin-right: 10px;
   flex-shrink: 0;
 }
@@ -596,7 +609,7 @@ onMounted(() => {
 }
 
 .type-info { flex: 1; min-width: 0; }
-.type-name { font-size: 15px; font-weight: 600; color: var(--color-text-tertiary, #374151); }
+.type-name { font-size: calc(15px * var(--font-scale, 1)); font-weight: 600; color: var(--color-text-tertiary, #374151); }
 .type-meta { font-size: var(--font-size-sm, 13px); color: var(--color-text-placeholder, #9CA3AF); margin-top: 3px; }
 
 /* 最近游戏 */
@@ -657,7 +670,7 @@ onMounted(() => {
 }
 
 .guest-register-title {
-  font-size: 15px;
+  font-size: calc(15px * var(--font-scale, 1));
   font-weight: 600;
   color: var(--color-text-primary, #1A1A1A);
 }

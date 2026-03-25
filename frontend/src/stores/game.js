@@ -7,10 +7,12 @@ import { showToast } from 'vant'
 
 export const useGameStore = defineStore('game',() => {
   const userStore = useUserStore()
+  const LAST_ROOM_STORAGE_KEY = 'last_room_context_v1'
 
   const currentGame = ref(null)
   const myGames = ref([])
   const loading = ref(false)
+  const lastViewedRoom = ref(null)
 
   // 统计缓存（5 分钟过期）
   const CACHE_TTL = 5 * 60 * 1000
@@ -18,8 +20,43 @@ export const useGameStore = defineStore('game',() => {
   const opponentsCache = ref({ data: null, ts: 0 })
   const leaderboardCache = ref({ data: null, ts: 0 })
 
+  const invalidateStatsCaches = () => {
+    statsCache.value = { data: null, ts: 0 }
+    opponentsCache.value = { data: null, ts: 0 }
+    leaderboardCache.value = { data: null, ts: 0 }
+  }
+
+  const loadLastViewedRoom = () => {
+    try {
+      lastViewedRoom.value = JSON.parse(localStorage.getItem(LAST_ROOM_STORAGE_KEY) || 'null')
+    } catch {
+      lastViewedRoom.value = null
+    }
+  }
+
+  const rememberLastViewedRoom = (game, from = '/home') => {
+    if (!game?.roomCode) return
+
+    const payload = {
+      roomCode: game.roomCode,
+      name: game.name,
+      gameType: game.gameType,
+      status: game.status,
+      playerCount: game.players?.length ?? game.playerCount ?? 0,
+      from,
+      updatedAt: new Date().toISOString(),
+    }
+
+    lastViewedRoom.value = payload
+    localStorage.setItem(LAST_ROOM_STORAGE_KEY, JSON.stringify(payload))
+  }
+
+  loadLastViewedRoom()
+
   // 获取或生成玩家ID
   const getPlayerId = () => {
+    userStore.ensureGuestSession()
+
     if (userStore.isGuest) {
       let guestId = localStorage.getItem('guestId')
       if (!guestId) {
@@ -46,6 +83,8 @@ export const useGameStore = defineStore('game',() => {
 
   // 获取玩家昵称
   const getPlayerNickname = () => {
+    userStore.ensureGuestSession()
+
     if (userStore.isGuest) {
       let nickname = localStorage.getItem('guestNickname')
       if (!nickname) {
@@ -78,6 +117,7 @@ export const useGameStore = defineStore('game',() => {
       })
 
       currentGame.value = game
+      invalidateStatsCaches()
       return game
     } catch (error) {
       const message = error.response?.data?.message || '创建游戏失败'
@@ -106,6 +146,7 @@ export const useGameStore = defineStore('game',() => {
       })
 
       currentGame.value = game
+      invalidateStatsCaches()
       return game
     } catch (error) {
       throw new Error(error.response?.data?.message || '加入游戏失败')
@@ -115,16 +156,24 @@ export const useGameStore = defineStore('game',() => {
   }
 
   // 获取游戏详情
-  const getGameDetail = async roomCode => {
-    loading.value = true
+  const getGameDetail = async (roomCode, options = {}) => {
+    const { silent = false } = options
+    if (!silent) {
+      loading.value = true
+    }
     try {
       const game = await gameApi.getGameDetail(roomCode)
       currentGame.value = game
+      if (!options?.skipRemember) {
+        rememberLastViewedRoom(game, options?.from || '/home')
+      }
       return game
     } catch (error) {
       throw new Error(error.response?.data?.message || '获取游戏详情失败')
     } finally {
-      loading.value = false
+      if (!silent) {
+        loading.value = false
+      }
     }
   }
 
@@ -132,15 +181,18 @@ export const useGameStore = defineStore('game',() => {
   const addScore = async (roomCode, fromPlayerId, toPlayerId, score, note = '') => {
     loading.value = true
     try {
+      const requesterId = getPlayerId()
       await gameApi.addScore(roomCode, {
         fromPlayerId: Number(fromPlayerId),
         toPlayerId: Number(toPlayerId),
         score: Number(score),
-        note
+        note,
+        requesterId,
       })
 
       // 刷新游戏详情
       await getGameDetail(roomCode)
+      invalidateStatsCaches()
     } catch (error) {
       throw new Error(error.response?.data?.message || '加分失败')
     } finally {
@@ -154,6 +206,7 @@ export const useGameStore = defineStore('game',() => {
       const playerId = getPlayerId()
       await gameApi.undoScore(roomCode, recordId, { requesterId: playerId })
       await getGameDetail(roomCode)
+      invalidateStatsCaches()
     } catch (error) {
       throw error
     }
@@ -162,7 +215,10 @@ export const useGameStore = defineStore('game',() => {
   // 更新玩家昵称
   const updatePlayerNickname = async (roomCode, playerId, newNickname, syncToProfile = false) => {
     try {
-      await gameApi.updatePlayerNickname(roomCode, playerId, { nickname: newNickname })
+      await gameApi.updatePlayerNickname(roomCode, playerId, {
+        nickname: newNickname,
+        requesterId: getPlayerId(),
+      })
 
       // 如果需要同步到个人资料
       if (syncToProfile && !userStore.isGuest) {
@@ -172,6 +228,7 @@ export const useGameStore = defineStore('game',() => {
 
       // 刷新游戏数据
       await getGameDetail(roomCode)
+      invalidateStatsCaches()
     } catch (error) {
       throw new Error(error.response?.data?.message || '更新昵称失败')
     }
@@ -181,8 +238,11 @@ export const useGameStore = defineStore('game',() => {
   const endGame = async roomCode => {
     loading.value = true
     try {
-      const result = await gameApi.endGame(roomCode)
+      const result = await gameApi.endGame(roomCode, {
+        requesterId: getPlayerId(),
+      })
       await getGameDetail(roomCode)
+      invalidateStatsCaches()
       return result
     } catch (error) {
       throw new Error(error.response?.data?.message || '结束游戏失败')
@@ -223,6 +283,7 @@ export const useGameStore = defineStore('game',() => {
     try {
       await gameApi.editGame(roomCode, data)
       await getGameDetail(roomCode)
+      invalidateStatsCaches()
     } catch (error) {
       throw new Error(error.response?.data?.message || '编辑游戏失败')
     } finally {
@@ -240,6 +301,7 @@ export const useGameStore = defineStore('game',() => {
       })
 
       await loadMyGames()
+      invalidateStatsCaches()
     } catch (error) {
       throw new Error(error.response?.data?.message || '删除游戏失败')
     } finally {
@@ -313,6 +375,7 @@ export const useGameStore = defineStore('game',() => {
     currentGame,
     myGames,
     loading,
+    lastViewedRoom,
     createGame,
     joinGame,
     getGameDetail,
@@ -327,6 +390,9 @@ export const useGameStore = defineStore('game',() => {
     getOpponentStats,
     getLeaderboard,
     getPlayerId,
-    getPlayerNickname
+    getPlayerNickname,
+    invalidateStatsCaches,
+    rememberLastViewedRoom,
+    loadLastViewedRoom,
   }
 })

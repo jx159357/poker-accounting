@@ -37,8 +37,8 @@ export const gameApi = {
   },
 
   // 结束游戏
-  endGame(roomCode) {
-    return request.post(`/game/${roomCode}/end`)
+  endGame(roomCode, data) {
+    return request.post(`/game/${roomCode}/end`, data)
   },
 
   // 编辑游戏

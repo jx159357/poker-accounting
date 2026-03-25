@@ -134,7 +134,7 @@ const handleGuestMode = () => {
 }
 
 .card-symbol {
-  font-size: 28px;
+  font-size: calc(28px * var(--font-scale, 1));
   color: rgba(255, 255, 255, 0.9);
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
@@ -144,7 +144,7 @@ const handleGuestMode = () => {
 }
 
 .brand-title {
-  font-size: 24px;
+  font-size: calc(24px * var(--font-scale, 1));
   font-weight: 700;
   color: #fff;
   margin: 0;
@@ -152,7 +152,7 @@ const handleGuestMode = () => {
 }
 
 .brand-subtitle {
-  font-size: 14px;
+  font-size: calc(14px * var(--font-scale, 1));
   color: rgba(255, 255, 255, 0.8);
   margin: 8px 0 0;
 }
@@ -181,13 +181,13 @@ const handleGuestMode = () => {
 
 .btn-login {
   height: 44px;
-  font-size: 16px;
+  font-size: calc(16px * var(--font-scale, 1));
   font-weight: 600;
 }
 
 .btn-register {
   height: 44px;
-  font-size: 15px;
+  font-size: calc(15px * var(--font-scale, 1));
   color: var(--color-primary, #16A34A) !important;
   border-color: var(--color-primary, #16A34A) !important;
 }
@@ -211,7 +211,7 @@ const handleGuestMode = () => {
 
 .btn-guest {
   height: 44px;
-  font-size: 15px;
+  font-size: calc(15px * var(--font-scale, 1));
   color: var(--color-text-secondary, #6B7280) !important;
   background: var(--color-bg-hover, #F3F4F6) !important;
   border: none !important;

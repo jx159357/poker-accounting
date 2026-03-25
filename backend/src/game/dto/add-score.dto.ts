@@ -17,4 +17,8 @@ export class AddScoreDto {
   @IsString()
   @IsOptional()
   note?: string;
+
+  @IsString()
+  @IsOptional()
+  requesterId?: string;
 }

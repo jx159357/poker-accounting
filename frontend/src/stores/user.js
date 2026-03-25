@@ -26,6 +26,13 @@ export const useUserStore = defineStore('user', () => {
     }
   }
 
+  const ensureGuestSession = () => {
+    if (!token.value && !username.value && !isGuest.value) {
+      isGuest.value = true
+      localStorage.setItem('isGuest', 'true')
+    }
+  }
+
   // 注册（游客自动转用户）
   const register = async (usernameInput, password) => {
     loading.value = true
@@ -117,6 +124,7 @@ export const useUserStore = defineStore('user', () => {
     isGuest,
     loading,
     init,
+    ensureGuestSession,
     register,
     login,
     setGuestMode,

@@ -16,6 +16,7 @@ body {
   min-height: 100vh;
   background-color: var(--color-bg, #F0F2F5);
   color: var(--color-text-primary, #1A1A1A);
+  font-size: var(--font-size-md, 14px);
 }
 
 #app {
@@ -85,7 +86,7 @@ body {
   border-radius: var(--radius-sm, 8px);
   padding: 4px 12px;
   font-weight: 700;
-  font-size: 18px;
+  font-size: calc(18px * var(--font-scale, 1));
   flex-shrink: 0;
 }
 
@@ -95,7 +96,7 @@ body {
   border-radius: var(--radius-sm, 8px);
   padding: 4px 12px;
   font-weight: 700;
-  font-size: 18px;
+  font-size: calc(18px * var(--font-scale, 1));
   flex-shrink: 0;
 }
 
@@ -189,7 +190,7 @@ body {
 /* ==================== 移动端优化 ==================== */
 @media (max-width: 640px) {
   body {
-    font-size: 14px;
+    font-size: var(--font-size-md, 14px);
   }
 }
 
@@ -201,6 +202,11 @@ body {
 
 .van-nav-bar__title {
   font-weight: 600 !important;
+}
+
+.van-nav-bar .van-icon-arrow-left,
+.van-nav-bar__left .van-icon {
+  font-size: calc(22px * var(--font-scale, 1)) !important;
 }
 
 .van-tabbar {

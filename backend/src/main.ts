@@ -24,7 +24,8 @@ async function bootstrap() {
   );
 
   const port = configService.get('PORT', 3000);
-  await app.listen(port);
-  console.log(`服务运行在端口 ${port}`);
+  const host = configService.get('HOST', '0.0.0.0');
+  await app.listen(port, host);
+  console.log(`服务运行在 ${host}:${port}`);
 }
 bootstrap();

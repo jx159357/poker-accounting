@@ -63,8 +63,8 @@ router.beforeEach((to, from, next) => {
     return
   }
 
-  // 如果没有 token 且不是游客，跳转到登录页
-  if (!userStore.token && !userStore.isGuest) {
+  // 仅对显式要求登录的页面做登录拦截
+  if (to.meta?.requiresAuth && !userStore.token && !userStore.isGuest) {
     next({ path: '/login', query: { redirect: to.fullPath } })
     return
   }

@@ -16,6 +16,10 @@ export function getFilterTypes() {
   return ['all', ...DEFAULT_GAME_TYPES.filter(t => t.enabled).map(t => t.value)];
 }
 
+export function isBuiltInGameType(type) {
+  return DEFAULT_GAME_TYPES.some(item => item.enabled && item.value === type);
+}
+
 /** 创建/编辑房间用: [...enabledTypes, '自定义'] */
 export function getSelectableTypes() {
   return [...DEFAULT_GAME_TYPES.filter(t => t.enabled).map(t => t.label), '自定义'];

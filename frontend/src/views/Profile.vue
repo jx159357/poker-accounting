@@ -1,6 +1,6 @@
 <template>
   <div class="h-full flex flex-col bg-gray-50 overflow-hidden">
-    <van-nav-bar title="个人资料" left-arrow @click-left="router.back()" />
+    <van-nav-bar title="个人资料" left-arrow @click-left="handleBack" />
 
     <van-loading v-if="loading" class="flex-1 flex items-center justify-center" />
 
@@ -94,6 +94,12 @@
               取消
             </van-button>
           </div>
+        </div>
+
+        <div class="profile-card">
+          <van-cell-group :border="false">
+            <van-cell title="界面设置" is-link @click="settingsStore.openDrawer()" />
+          </van-cell-group>
         </div>
 
         <!-- 游客转注册 -->
@@ -193,12 +199,15 @@ import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useUserStore } from '../stores/user';
 import { useGameStore } from '../stores/game';
+import { useSettingsStore } from '../stores/settings';
 import { showToast, showConfirmDialog } from 'vant';
 import { authApi } from '../api/auth';
+import { goBackWithFallback } from '../utils/navigation';
 
 const router = useRouter();
 const userStore = useUserStore();
 const gameStore = useGameStore();
+const settingsStore = useSettingsStore();
 
 const loading = ref(false);
 const saving = ref(false);
@@ -224,6 +233,10 @@ const showAchievements = ref(false);
 const guestId = computed(() => {
   return localStorage.getItem('guestId') || '';
 });
+
+const handleBack = () => {
+  goBackWithFallback(router, '/home');
+};
 
 const getInitial = (name) => {
   if (!name || typeof name !== 'string' || name.length === 0) {
@@ -390,6 +403,7 @@ onMounted(() => {
   flex-direction: column;
   align-items: center;
   padding-top: 18px;
+  padding-bottom: 10px;
 }
 
 .profile-avatar {
@@ -400,7 +414,7 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   color: #fff;
-  font-size: 20px;
+  font-size: calc(20px * var(--font-scale, 1));
   font-weight: 700;
   border: 2px solid #fff;
   box-shadow: var(--shadow-md);
@@ -410,17 +424,17 @@ onMounted(() => {
   font-size: var(--font-size-lg, 16px);
   font-weight: 700;
   color: var(--color-text-primary, #1A1A1A);
-  margin-top: 6px;
+  margin-top: 12px;
 }
 
 .profile-role {
   font-size: var(--font-size-sm, 13px);
   color: var(--color-text-secondary, #6B7280);
-  margin-top: 2px;
+  margin-top: 6px;
 }
 
 .profile-id {
-  font-size: var(--font-size-xs, 12px);
+  font-size: var(--font-size-sm, 13px);
   color: var(--color-text-placeholder, #9CA3AF);
 }
 
@@ -540,7 +554,7 @@ onMounted(() => {
 }
 
 .achievement-icon {
-  font-size: 28px;
+  font-size: calc(28px * var(--font-scale, 1));
   margin-bottom: 6px;
 }
 

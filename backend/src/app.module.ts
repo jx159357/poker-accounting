@@ -44,6 +44,7 @@ import { GameModule } from './game/game.module';
     ServeStaticModule.forRoot({
       rootPath: join(__dirname, '..', 'public'),
       exclude: ['/api/{*path}'],
+      renderPath: '{*any}',
     }),
 
     AuthModule,

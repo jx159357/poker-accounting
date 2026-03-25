@@ -63,9 +63,18 @@ bash scripts/build.sh
 | JWT_SECRET | JWT 签名密钥 | (必填) |
 | JWT_EXPIRES_IN | Token 有效期 | 7d |
 | PORT | 服务端口 | 3000 |
+| HOST | 服务监听地址 | 0.0.0.0 |
 | NODE_ENV | 环境 | development |
 | DB_PATH | SQLite 文件路径 | ./data/poker-accounting.db |
 | CORS_ORIGIN | 允许的跨域来源 | http://localhost:9527 |
+| VITE_PUBLIC_APP_URL | 二维码/外部分享使用的公网 HTTPS 地址 | 当前访问域名 |
+
+### Railway 部署提示
+
+- 如果前后端由当前 Nest 服务统一对外提供，扫码链接建议使用 Railway 分配的公网 HTTPS 域名或你自己的自定义域名。
+- 若希望二维码始终指向固定域名，可在前端构建时设置 `VITE_PUBLIC_APP_URL=https://你的域名`。
+- 本项目使用 `vue-router` 的 history 路由，后端已通过 `ServeStaticModule` 对 `/api/*` 之外的路径回退到前端入口，适合扫码直接打开 `/room/:roomCode`。
+- 如果继续使用 SQLite，建议在 Railway 给服务挂载 Volume 到 `/app/data`，并将 `DB_PATH=/app/data/poker-accounting.db`，否则数据库文件会随重部署或实例变化丢失。
 
 ## API 概览
 
