@@ -1107,19 +1107,33 @@ export class GameService {
   // 定时清理空房间（每小时执行，< 2 人的活跃房间 3 小时后销毁）
   @Cron(CronExpression.EVERY_HOUR)
   async cleanupEmptyRooms(): Promise<void> {
-    this.logger.log('Running cleanup: checking for empty rooms older than 3 hours');
+    this.logger.log('Running cleanup: checking for inactive rooms older than 3 hours');
     const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000);
 
     const emptyGames = await this.gameRepository
       .createQueryBuilder('game')
       .leftJoinAndSelect('game.players', 'player')
-      .where('game.createdAt < :threeHoursAgo', { threeHoursAgo })
+      .leftJoinAndSelect('game.gameRecords', 'record')
       .andWhere('game.status = :status', { status: 'active' })
       .getMany();
 
-    const gamesToDelete = emptyGames.filter(
-      (game) => game.players.length < 2,
-    );
+    const gamesToDelete = emptyGames.filter((game) => {
+      if (game.players.length >= 2) {
+        return false;
+      }
+
+      const latestActivityAt = [
+        game.updatedAt,
+        game.createdAt,
+        ...(game.players || []).map((player) => player.joinedAt),
+        ...(game.gameRecords || []).map((record) => record.createdAt),
+      ]
+        .filter(Boolean)
+        .map((value) => new Date(value).getTime())
+        .reduce((latest, value) => Math.max(latest, value), 0);
+
+      return latestActivityAt > 0 && latestActivityAt < threeHoursAgo.getTime();
+    });
 
     if (gamesToDelete.length > 0) {
       const roomCodes = gamesToDelete.map(g => g.roomCode).join(', ');

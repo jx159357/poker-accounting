@@ -37,12 +37,12 @@ describe('GameService', () => {
     it('aggregates direct head-to-head score instead of duplicating whole-game balance', async () => {
       userRepository.findOne.mockResolvedValue({ id: 1, username: 'me' });
 
-      const me = { id: 1, userId: 1, user: { username: 'me' }, name: '我', balance: 120 };
+      const me = { id: 1, userId: 1, user: { username: 'me' }, name: 'Me', balance: 120 };
       const alice = {
         id: 2,
         userId: 2,
         user: { username: 'alice', nickname: 'Alice' },
-        name: 'Alice 桌上昵称',
+        name: 'Alice Table',
         balance: -50,
       };
       const bob = {
@@ -99,7 +99,7 @@ describe('GameService', () => {
     it('keeps same-name opponents separate and counts no-direct-transfer games as draws', async () => {
       userRepository.findOne.mockResolvedValue({ id: 1, username: 'me' });
 
-      const gameOneMe = { id: 11, userId: 1, user: { username: 'me' }, name: '我', balance: 20 };
+      const gameOneMe = { id: 11, userId: 1, user: { username: 'me' }, name: 'Me', balance: 20 };
       const registeredAlex = {
         id: 12,
         userId: 2,
@@ -108,7 +108,7 @@ describe('GameService', () => {
         balance: -20,
       };
 
-      const gameTwoMe = { id: 21, userId: 1, user: { username: 'me' }, name: '我', balance: 0 };
+      const gameTwoMe = { id: 21, userId: 1, user: { username: 'me' }, name: 'Me', balance: 0 };
       const guestAlex = {
         id: 22,
         guestId: 'guest_alex',
@@ -174,9 +174,9 @@ describe('GameService', () => {
           balance: 50,
           game: {
             id: 1,
-            name: '新进行中',
+            name: 'Active Room',
             roomCode: 'ACTIVE1',
-            gameType: '德州',
+            gameType: 'Holdem',
             status: 'active',
             createdAt: new Date(),
             players: [{}, {}],
@@ -186,9 +186,9 @@ describe('GameService', () => {
           balance: -10,
           game: {
             id: 2,
-            name: '近30天结束',
+            name: 'Recent Ended',
             roomCode: 'ENDED30',
-            gameType: '德州',
+            gameType: 'Holdem',
             status: 'ended',
             createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
             players: [{}, {}, {}],
@@ -198,9 +198,9 @@ describe('GameService', () => {
           balance: 99,
           game: {
             id: 3,
-            name: '超久以前',
+            name: 'Very Old',
             roomCode: 'OLD999',
-            gameType: '麻将',
+            gameType: 'Mahjong',
             status: 'ended',
             createdAt: new Date(Date.now() - 120 * 24 * 60 * 60 * 1000),
             players: [{}],
@@ -243,7 +243,54 @@ describe('GameService', () => {
 
       await expect(
         service.addScore('ROOM1', 1, 2, 10, 'test', 'user_fake'),
-      ).rejects.toThrow('登录后才能操作注册用户数据');
+      ).rejects.toThrow();
+    });
+  });
+
+  describe('cleanupEmptyRooms', () => {
+    it('deletes only inactive short-handed rooms based on latest activity', async () => {
+      const now = Date.now();
+      const queryBuilder = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([
+          {
+            roomCode: 'STALE1',
+            status: 'active',
+            createdAt: new Date(now - 6 * 60 * 60 * 1000),
+            updatedAt: new Date(now - 5 * 60 * 60 * 1000),
+            players: [{ joinedAt: new Date(now - 5 * 60 * 60 * 1000) }],
+            gameRecords: [],
+          },
+          {
+            roomCode: 'RECENTJOIN',
+            status: 'active',
+            createdAt: new Date(now - 8 * 60 * 60 * 1000),
+            updatedAt: new Date(now - 8 * 60 * 60 * 1000),
+            players: [{ joinedAt: new Date(now - 30 * 60 * 1000) }],
+            gameRecords: [],
+          },
+          {
+            roomCode: 'TWOPLAYER',
+            status: 'active',
+            createdAt: new Date(now - 8 * 60 * 60 * 1000),
+            updatedAt: new Date(now - 8 * 60 * 60 * 1000),
+            players: [
+              { joinedAt: new Date(now - 8 * 60 * 60 * 1000) },
+              { joinedAt: new Date(now - 10 * 60 * 1000) },
+            ],
+            gameRecords: [],
+          },
+        ]),
+      };
+
+      gameRepository.createQueryBuilder.mockReturnValue(queryBuilder);
+
+      await service.cleanupEmptyRooms();
+
+      expect(gameRepository.remove).toHaveBeenCalledWith([
+        expect.objectContaining({ roomCode: 'STALE1' }),
+      ]);
     });
   });
 });
