@@ -3,13 +3,11 @@ import { ref } from 'vue'
 import { authApi } from '../api/auth'
 
 export const useUserStore = defineStore('user', () => {
-  // 从 localStorage 初始化状态
   const token = ref(localStorage.getItem('token') || '')
   const username = ref(localStorage.getItem('username') || '')
   const isGuest = ref(localStorage.getItem('isGuest') === 'true')
   const loading = ref(false)
 
-  // 初始化函数 - 确保从 localStorage 恢复状态
   const init = () => {
     const savedToken = localStorage.getItem('token')
     const savedUsername = localStorage.getItem('username')
@@ -18,9 +16,11 @@ export const useUserStore = defineStore('user', () => {
     if (savedToken) {
       token.value = savedToken
     }
+
     if (savedUsername) {
       username.value = savedUsername
     }
+
     if (savedIsGuest !== null) {
       isGuest.value = savedIsGuest === 'true'
     }
@@ -33,22 +33,28 @@ export const useUserStore = defineStore('user', () => {
     }
   }
 
-  // 注册（游客自动转用户）
+  const clearGuestSession = () => {
+    localStorage.removeItem('guestId')
+    localStorage.removeItem('guestNickname')
+  }
+
   const register = async (usernameInput, password) => {
     loading.value = true
+
     try {
       let data
       const guestId = localStorage.getItem('guestId')
+
       if (isGuest.value && guestId) {
         data = await authApi.guestToUser({
           username: usernameInput,
           password,
-          guestId
+          guestId,
         })
       } else {
         data = await authApi.register({
           username: usernameInput,
-          password
+          password,
         })
       }
 
@@ -59,8 +65,7 @@ export const useUserStore = defineStore('user', () => {
       localStorage.setItem('token', data.access_token)
       localStorage.setItem('username', data.username)
       localStorage.setItem('isGuest', 'false')
-      localStorage.removeItem('guestId')
-      localStorage.removeItem('guestNickname')
+      clearGuestSession()
     } catch (error) {
       throw new Error(error.response?.data?.message || '注册失败')
     } finally {
@@ -68,13 +73,25 @@ export const useUserStore = defineStore('user', () => {
     }
   }
 
-  // 登录
+  const mergeGuestDataAfterLogin = async (guestId) => {
+    if (!guestId) return
+
+    try {
+      await authApi.mergeGuest({ guestId })
+      clearGuestSession()
+    } catch (error) {
+      console.error('Failed to merge guest data after login', error)
+    }
+  }
+
   const login = async (usernameInput, password) => {
     loading.value = true
+
     try {
+      const guestId = isGuest.value ? localStorage.getItem('guestId') : ''
       const data = await authApi.login({
         username: usernameInput,
-        password
+        password,
       })
 
       token.value = data.access_token
@@ -84,6 +101,8 @@ export const useUserStore = defineStore('user', () => {
       localStorage.setItem('token', data.access_token)
       localStorage.setItem('username', data.username)
       localStorage.setItem('isGuest', 'false')
+
+      await mergeGuestDataAfterLogin(guestId)
     } catch (error) {
       throw new Error(error.response?.data?.message || '登录失败')
     } finally {
@@ -91,7 +110,6 @@ export const useUserStore = defineStore('user', () => {
     }
   }
 
-  // 游客模式
   const setGuestMode = () => {
     isGuest.value = true
     token.value = ''
@@ -102,7 +120,6 @@ export const useUserStore = defineStore('user', () => {
     localStorage.removeItem('username')
   }
 
-  // 退出登录
   const logout = () => {
     token.value = ''
     username.value = ''
@@ -111,11 +128,9 @@ export const useUserStore = defineStore('user', () => {
     localStorage.removeItem('token')
     localStorage.removeItem('username')
     localStorage.removeItem('isGuest')
-    localStorage.removeItem('guestId')
-    localStorage.removeItem('guestNickname')
+    clearGuestSession()
   }
 
-  // 页面加载时初始化
   init()
 
   return {
@@ -128,6 +143,6 @@ export const useUserStore = defineStore('user', () => {
     register,
     login,
     setGuestMode,
-    logout
+    logout,
   }
 })

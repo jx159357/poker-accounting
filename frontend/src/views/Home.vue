@@ -111,12 +111,14 @@
           </div>
 
           <div class="list-scroll" :class="{ 'list-scroll-empty': filteredGames.length === 0 }">
-            <van-loading v-if="gameStore.loading && !gameStore.myGames" class="py-8" />
+            <van-loading v-if="gameStore.loading && !gameStore.myGames.length" class="py-8" />
 
             <van-empty
               v-else-if="filteredGames.length === 0"
+              class="home-empty-state"
               :description="emptyDescription"
               image="search"
+              :image-size="68"
             >
               <van-button
                 type="primary"
@@ -594,6 +596,8 @@ watch(activeSortKey, (value) => {
 });
 
 onMounted(() => {
+  console.log(document.documentElement.scrollWidth === document.documentElement.clientWidth,'99999');
+
   const savedFilter = localStorage.getItem(HOME_FILTER_STORAGE_KEY);
   if (savedFilter && listFilters.some(option => option.key === savedFilter)) {
     activeListFilter.value = savedFilter;
@@ -613,6 +617,8 @@ onMounted(() => {
 
 <style scoped>
 .home-page-shell {
+  width: 100%;
+  max-width: 100%;
   padding: 16px;
   display: flex;
   flex-direction: column;
@@ -625,6 +631,8 @@ onMounted(() => {
 .hero-card {
   position: relative;
   overflow: hidden;
+  width: 100%;
+  max-width: 100%;
   border-radius: 20px;
   padding: 16px;
   color: #fff;
@@ -701,6 +709,7 @@ onMounted(() => {
 
 .hero-return {
   width: 100%;
+  max-width: 100%;
   margin-top: 12px;
   border: none;
   border-radius: 16px;
@@ -740,6 +749,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 10px;
+  min-width: 0;
   background: var(--color-bg-white, #fff);
   border-radius: 16px;
   padding: 14px;
@@ -794,6 +804,7 @@ onMounted(() => {
 
 .guest-growth-card {
   width: 100%;
+  max-width: 100%;
   border: none;
   position: relative;
   background:
@@ -861,6 +872,8 @@ onMounted(() => {
 
 .list-card {
   background: rgba(255, 255, 255, 0.92);
+  width: 100%;
+  max-width: 100%;
   border-radius: 20px;
   padding: 14px;
   box-shadow: var(--shadow-sm);
@@ -1052,10 +1065,28 @@ onMounted(() => {
 }
 
 .list-scroll-empty {
-  overflow: hidden;
+  overflow-y: auto;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  align-items: stretch;
+  justify-content: flex-start;
+  padding-top: clamp(8px, 4vh, 20px);
+}
+
+.home-empty-state {
+  width: 100%;
+  padding: 8px 0 16px;
+}
+
+.home-empty-state :deep(.van-empty__image) {
+  margin-inline: auto;
+}
+
+.home-empty-state :deep(.van-empty__description) {
+  line-height: 1.5;
+}
+
+.home-empty-state :deep(.van-empty__bottom) {
+  margin-top: 14px;
 }
 
 .game-list {

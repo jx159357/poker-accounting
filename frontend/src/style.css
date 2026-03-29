@@ -10,10 +10,26 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+html {
+  width: 100%;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: inherit;
+}
+
 body {
   margin: 0;
+  width: 100%;
+  max-width: 100%;
   min-width: 320px;
   min-height: 100vh;
+  min-height: 100dvh;
+  overflow-x: hidden;
   background-color: var(--color-bg, #F0F2F5);
   color: var(--color-text-primary, #1A1A1A);
   font-size: var(--font-size-md, 14px);
@@ -21,6 +37,8 @@ body {
 
 #app {
   width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 /* ==================== 页面切换过渡动画 ==================== */

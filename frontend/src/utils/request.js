@@ -27,7 +27,9 @@ request.interceptors.response.use(
     return response.data
   },
   error => {
-    if (error.response?.status === 401) {
+    const hasToken = Boolean(localStorage.getItem('token'))
+
+    if (error.response?.status === 401 && hasToken) {
       localStorage.removeItem('token')
       localStorage.removeItem('username')
       localStorage.setItem('isGuest', 'false')

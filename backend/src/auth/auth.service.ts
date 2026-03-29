@@ -27,9 +27,38 @@ export class AuthService {
     private jwtService: JwtService,
   ) {}
 
-  // 注册
+  private async reassignGameRecords(
+    guestPlayerId: number,
+    targetPlayer: GamePlayer,
+  ) {
+    const relatedRecords = await this.gameRecordRepository.find({
+      where: [
+        { fromPlayer: { id: guestPlayerId } },
+        { toPlayer: { id: guestPlayerId } },
+      ],
+      relations: ['fromPlayer', 'toPlayer'],
+    });
+
+    if (!relatedRecords.length) {
+      return;
+    }
+
+    const updatedRecords = relatedRecords.map((record) => {
+      if (record.fromPlayer?.id === guestPlayerId) {
+        record.fromPlayer = targetPlayer;
+      }
+
+      if (record.toPlayer?.id === guestPlayerId) {
+        record.toPlayer = targetPlayer;
+      }
+
+      return record;
+    });
+
+    await this.gameRecordRepository.save(updatedRecords);
+  }
+
   async register(username: string, password: string, nickname?: string) {
-    // 检查用户名是否已存在
     const existingUser = await this.userRepository.findOne({
       where: { username },
     });
@@ -38,10 +67,8 @@ export class AuthService {
       throw new ConflictException('用户名已存在');
     }
 
-    // 加密密码
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // 创建用户
     const user = this.userRepository.create({
       username,
       password: hashedPassword,
@@ -50,22 +77,19 @@ export class AuthService {
 
     await this.userRepository.save(user);
 
-    // 生成 token
     const payload = {
       sub: user.id,
       username: user.username,
       nickname: user.nickname || user.username,
     };
-    const access_token = this.jwtService.sign(payload);
 
     return {
-      access_token,
+      access_token: this.jwtService.sign(payload),
       username: user.username,
       nickname: user.nickname || user.username,
     };
   }
 
-  // 登录
   async login(username: string, password: string) {
     const user = await this.userRepository.findOne({ where: { username } });
 
@@ -84,16 +108,14 @@ export class AuthService {
       username: user.username,
       nickname: user.nickname || user.username,
     };
-    const access_token = this.jwtService.sign(payload);
 
     return {
-      access_token,
+      access_token: this.jwtService.sign(payload),
       username: user.username,
       nickname: user.nickname || user.username,
     };
   }
 
-  // 获取用户信息
   async getProfile(userId: number) {
     const user = await this.userRepository.findOne({ where: { id: userId } });
 
@@ -109,7 +131,6 @@ export class AuthService {
     };
   }
 
-  // 更新用户信息
   async updateProfile(userId: number, data: { nickname?: string }) {
     const user = await this.userRepository.findOne({ where: { id: userId } });
 
@@ -130,13 +151,11 @@ export class AuthService {
     };
   }
 
-  // 游客转注册用户
   async convertGuestToUser(
     username: string,
     password: string,
     guestId: string,
   ) {
-    // 检查用户名是否已存在
     const existingUser = await this.userRepository.findOne({
       where: { username },
     });
@@ -145,10 +164,8 @@ export class AuthService {
       throw new ConflictException('用户名已存在');
     }
 
-    // 加密密码
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // 创建用户
     const user = this.userRepository.create({
       username,
       password: hashedPassword,
@@ -157,7 +174,6 @@ export class AuthService {
 
     await this.userRepository.save(user);
 
-    // 更新游客的游戏记录
     await this.gamePlayerRepository
       .createQueryBuilder()
       .update(GamePlayer)
@@ -165,7 +181,6 @@ export class AuthService {
       .where('guestId = :guestId', { guestId })
       .execute();
 
-    // 更新游客创建的游戏
     await this.gameRepository
       .createQueryBuilder()
       .update(Game)
@@ -173,29 +188,28 @@ export class AuthService {
       .where('guestId = :guestId', { guestId })
       .execute();
 
-    // 生成 token
     const payload = {
       sub: user.id,
       username: user.username,
       nickname: user.nickname,
     };
-    const access_token = this.jwtService.sign(payload);
 
     return {
-      access_token,
+      access_token: this.jwtService.sign(payload),
       username: user.username,
       nickname: user.nickname,
     };
   }
 
-  // 修改密码
   async changePassword(userId: number, oldPassword: string, newPassword: string) {
     const user = await this.userRepository.findOne({ where: { id: userId } });
+
     if (!user) {
       throw new NotFoundException('用户不存在');
     }
 
     const isOldValid = await bcrypt.compare(oldPassword, user.password);
+
     if (!isOldValid) {
       throw new UnauthorizedException('旧密码不正确');
     }
@@ -206,16 +220,13 @@ export class AuthService {
     return { message: '密码修改成功' };
   }
 
-  // 合并游客数据到已有用户
   async mergeGuestData(userId: number, guestId: string) {
-    // 查找游客的所有游戏玩家记录
     const guestPlayers = await this.gamePlayerRepository.find({
       where: { guestId },
       relations: ['game'],
     });
 
     for (const guestPlayer of guestPlayers) {
-      // 检查用户是否已经在这个游戏中
       const existingPlayer = await this.gamePlayerRepository.findOne({
         where: {
           userId,
@@ -224,41 +235,18 @@ export class AuthService {
       });
 
       if (existingPlayer) {
-        // 如果已存在，合并余额
         existingPlayer.balance =
           Number(existingPlayer.balance) + Number(guestPlayer.balance);
         await this.gamePlayerRepository.save(existingPlayer);
-
-        // 更新游戏记录中的玩家引用
-        await this.gameRecordRepository
-          .createQueryBuilder()
-          .update(GameRecord)
-          .set({ fromPlayer: existingPlayer })
-          .where('fromPlayer = :guestPlayerId', {
-            guestPlayerId: guestPlayer.id,
-          })
-          .execute();
-
-        await this.gameRecordRepository
-          .createQueryBuilder()
-          .update(GameRecord)
-          .set({ toPlayer: existingPlayer })
-          .where('toPlayer = :guestPlayerId', {
-            guestPlayerId: guestPlayer.id,
-          })
-          .execute();
-
-        // 删除游客玩家记录
+        await this.reassignGameRecords(guestPlayer.id, existingPlayer);
         await this.gamePlayerRepository.remove(guestPlayer);
       } else {
-        // 如果不存在，直接转换
         guestPlayer.userId = userId;
         guestPlayer.guestId = null;
         await this.gamePlayerRepository.save(guestPlayer);
       }
     }
 
-    // 更新游客创建的游戏
     await this.gameRepository
       .createQueryBuilder()
       .update(Game)

@@ -1,1 +1,0 @@
-const l=[{label:"跑得快",value:"跑得快",enabled:!0},{label:"斗地主",value:"斗地主",enabled:!0},{label:"麻将",value:"麻将",enabled:!0},{label:"德州扑克",value:"德州扑克",enabled:!0},{label:"其他",value:"其他",enabled:!0}];function a(){return["all",...l.filter(e=>e.enabled).map(e=>e.value)]}function t(){return[...l.filter(e=>e.enabled).map(e=>e.label),"自定义"]}export{a,t as g};

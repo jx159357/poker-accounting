@@ -766,7 +766,11 @@ const loadGame = async ({ silent = false } = {}) => {
 
   isRefreshingRoom = true
   try {
-    await gameStore.getGameDetail(roomCode, { silent, from: backTarget.value });
+    await gameStore.getGameDetail(roomCode, {
+      silent,
+      from: backTarget.value,
+      skipRemember: silent,
+    });
     // 首次加载时检查是否为房间玩家
     if (!showJoinPrompt.value && !isPlayerInGame.value && !hasCheckedJoin) {
       hasCheckedJoin = true;

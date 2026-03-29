@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { useUserStore } from './user'
 import { gameApi } from '../api/game'
 import { authApi } from '../api/auth'
@@ -26,9 +26,20 @@ export const useGameStore = defineStore('game',() => {
     leaderboardCache.value = { data: null, ts: 0 }
   }
 
+  const getLastViewedRoomStorageKey = () => {
+    if (userStore.isGuest) {
+      const guestId = localStorage.getItem('guestId')
+      return `${LAST_ROOM_STORAGE_KEY}:guest:${guestId || 'anonymous'}`
+    }
+
+    const username = userStore.username || localStorage.getItem('username')
+    return `${LAST_ROOM_STORAGE_KEY}:user:${username || 'anonymous'}`
+  }
+
   const loadLastViewedRoom = () => {
     try {
-      lastViewedRoom.value = JSON.parse(localStorage.getItem(LAST_ROOM_STORAGE_KEY) || 'null')
+      localStorage.removeItem(LAST_ROOM_STORAGE_KEY)
+      lastViewedRoom.value = JSON.parse(localStorage.getItem(getLastViewedRoomStorageKey()) || 'null')
     } catch {
       lastViewedRoom.value = null
     }
@@ -48,10 +59,16 @@ export const useGameStore = defineStore('game',() => {
     }
 
     lastViewedRoom.value = payload
-    localStorage.setItem(LAST_ROOM_STORAGE_KEY, JSON.stringify(payload))
+    localStorage.setItem(getLastViewedRoomStorageKey(), JSON.stringify(payload))
   }
 
-  loadLastViewedRoom()
+  watch(
+    () => [userStore.isGuest, userStore.username],
+    () => {
+      loadLastViewedRoom()
+    },
+    { immediate: true }
+  )
 
   // 获取或生成玩家ID
   const getPlayerId = () => {
@@ -62,6 +79,7 @@ export const useGameStore = defineStore('game',() => {
       if (!guestId) {
         guestId = `guest_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
         localStorage.setItem('guestId', guestId)
+        loadLastViewedRoom()
       }
       return guestId
     } else {

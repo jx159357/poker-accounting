@@ -3,23 +3,22 @@
     <div class="page-content">
       <router-view v-slot="{ Component }">
         <Transition name="page-fade" mode="out-in">
-          <component :is="Component" />
+          <component :is="Component" :key="route.path" />
         </Transition>
       </router-view>
     </div>
 
-    <!-- 底部导航栏 - 仅在主要页面显示 -->
     <van-tabbar
       v-if="showTabbar"
-      v-model="activeTab"
-      route
+      :model-value="activeTab"
       :placeholder="true"
       class="app-tabbar"
+      @change="handleTabChange"
     >
-      <van-tabbar-item icon="home-o" to="/home">首页</van-tabbar-item>
-      <van-tabbar-item icon="orders-o" to="/history">历史</van-tabbar-item>
-      <van-tabbar-item icon="chart-trending-o" to="/statistics">统计</van-tabbar-item>
-      <van-tabbar-item icon="user-o" to="/profile">我的</van-tabbar-item>
+      <van-tabbar-item name="/home" icon="home-o">首页</van-tabbar-item>
+      <van-tabbar-item name="/history" icon="orders-o">历史</van-tabbar-item>
+      <van-tabbar-item name="/statistics" icon="chart-trending-o">统计</van-tabbar-item>
+      <van-tabbar-item name="/profile" icon="user-o">我的</van-tabbar-item>
     </van-tabbar>
 
     <SettingsDrawer />
@@ -27,28 +26,37 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import SettingsDrawer from './components/SettingsDrawer.vue'
 import { useSettingsStore } from './stores/settings'
 
 const route = useRoute()
-const activeTab = ref(0)
+const router = useRouter()
 const settingsStore = useSettingsStore()
 
 settingsStore.init()
 
-// 只在这些页面显示底部导航
 const tabbarPages = ['/home', '/history', '/statistics', '/profile']
 
 const showTabbar = computed(() => {
   return tabbarPages.includes(route.path)
 })
+
+const activeTab = computed(() => {
+  return tabbarPages.includes(route.path) ? route.path : ''
+})
+
+const handleTabChange = (path) => {
+  if (!path || path === route.path) return
+  router.push(path)
+}
 </script>
 
 <style scoped>
 .app-container {
   height: 100vh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -62,10 +70,13 @@ const showTabbar = computed(() => {
   flex: 1;
   overflow: hidden;
   min-height: 0;
+  position: relative;
+  z-index: 0;
 }
 
 .app-tabbar {
   --van-tabbar-item-active-color: #16A34A;
+  z-index: 10;
 }
 
 .app-tabbar :deep(.van-tabbar-item__icon) {
